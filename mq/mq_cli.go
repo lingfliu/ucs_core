@@ -1,15 +1,17 @@
 package mq
 
-import {
+import (
+	"log"
+
 	"github.com/nsqio/go-nsq"
-}
+)
+
 /**
  * Message queue client for nsq
  */
 type MqMsg struct {
 	content string
 }
-
 
 type MQCli struct {
 	producer *nsq.Producer
