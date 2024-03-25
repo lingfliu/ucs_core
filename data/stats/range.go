@@ -1,3 +1,7 @@
 package stats
 
-struct
+type Range struct {
+	Dimen int
+	Min   float64
+	Max   float64
+}

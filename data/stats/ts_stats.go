@@ -1,15 +1,11 @@
 package stats
 
-func Minmax(dao Dao, range Range) (int, int) {
-	min := range[0]
-	max := range[0]
-	for _, v := range {
-		if v < min {
-			min = v
-		}
-		if v > max {
-			max = v
-		}
-	}
-	return min, max
-}
+//TODO implement Dao
+// func Minmax(dao Dao, r Range) (int, int) {
+// min := r.Min
+// max := r.Max
+
+// dao.Query("SELECT MIN(?) FROM ?", r.Dimen, dao.Table)
+
+// return 1, 1
+// }
