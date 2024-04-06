@@ -4,6 +4,8 @@ const CONN_STATE_DISCONNECTED = 1
 const CONN_STATE_CONNECTED = 0
 
 const CONN_CLASS_TCP string = "tcp"
+const CONN_CLASS_UDP string = "udp"
+const CONN_CLASS_kcp string = "kcp"
 const CONN_CLASS_QUIC string = "quic"
 const CONN_CLASS_HTTP string = "http"
 
