@@ -1,15 +1,49 @@
 package types
 
-type Pos struct {
+/**
+ * 位置信息
+ */
+type GPos struct {
 	// GNSS position
-	longitude float64
-	latitude  float64
-	altitude  float64
+	Longitude float64
+	Latitude  float64
+	Altitude  float64
 
 	// local position
-	x        float64
-	y        float64
-	h        float64
-	addr_maj float64
-	addr_min float64
+	X float64
+	Y float64
+	H float64
+	//辅助地址编码信息，如楼层，区域等
+	AddrMaj int
+	AddrMin int
+}
+
+/**
+ * Local空间坐标
+ */
+type LPos struct {
+	//position (m)
+	X float64
+	Y float64
+	Z float64
+
+	//rotation (rad)
+	Raw   float64
+	Yaw   float64
+	Pitch float64
+}
+
+/**
+ * 速度信息
+ */
+type Velo struct {
+	//position (m/s)
+	X float64
+	Y float64
+	Z float64
+
+	//角速度 (rad/s)
+	Raw   float64
+	Yaw   float64
+	Pitch float64
 }

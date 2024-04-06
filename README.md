@@ -3,9 +3,9 @@
 ## Framework
 ```
 conn           connection engine
-    | net
-    | coder      data protocol coder
-    | server     workflow handling
+    | conn      
+    | coder    data protocol coder
+    | srv      workflow handling
 data           
     | model    data modeling
     | orm      orm accessor
@@ -17,25 +17,18 @@ etl
     | membuff
     | st_slice  spatial-temporal data formatting
     | flow      Flink based stream computation
-dd             data distribution
-    | packet no-RT msg dispatching
-    | stream   data stream distribution (RT DD)
-    | mapping  convert stream to another
-mq             message queue
+dd              data distribution
+    | packet    no-RT msg dispatching
+    | stream    data stream distribution (RT DD)
+    | mapping   convert stream to another
+mq              message queue
 alg
-    node       alg in-node management
-    node_mgr        node management
-utils
-
-spec           servers, data etc. specified for different applications
-    | ucs
-        | model
-        | server
-        | flow
-        | rules
-    | others
-
-scripts        script for database, mq deployment
+    alg         algorithm wrapper
+    algNode     alg node server
+    node_mgr    alg node server manager (load balance, reverse proxy)
+utils           tools
+cfg             service, log, tmp output config
+scripts         script for database, mq deployment
 ```
 ## How to install
 To run directly on the system:

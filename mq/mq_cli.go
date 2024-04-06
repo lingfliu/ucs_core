@@ -41,7 +41,7 @@ func (cli *MQCli) PublishJson(json string, topic string) {
 }
 
 func (cli *MQCli) PublishObj(msg any, topic string) {
-	cli.producer.Publish(topic, msg.Serialize())
+	// cli.producer.Publish(topic, msg.Serialize())
 }
 
 func (cli *MQCli) PublishStream(url string, topic string) {
