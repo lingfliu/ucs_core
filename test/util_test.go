@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"issc.io/mmitp/mmitp-core/utils"
+	"github.com/lingfliu/ucs_core/utils"
 )
 
 func TestByte2Int(t *testing.T) {

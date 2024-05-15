@@ -40,34 +40,34 @@ func (mb *MemBuff) Push(name string, data *types.Data) {
 	// stData = mb.StSlice()
 }
 
-func (mb *MemBuff) StSlice(step int64, data types.Data) *types.Data {
+// func (mb *MemBuff) StSlice(step int64, data types.Data) *types.Data {
 
-	tsIdx := (data.Ts - mb.TsBaseline) % mb.TsStep
+// 	tsIdx := (data.Ts - mb.TsBaseline) % mb.TsStep
 
-	dBaseline := &types.Data{
-		Meta:    data.Meta,
-		Ts:      mb.TsBaseline + tsIdx*mb.TsStep,
-		Payload: data.Payload,
-	}
+// 	dBaseline := &types.Data{
+// 		Meta:    data.Meta,
+// 		Ts:      mb.TsBaseline + tsIdx*mb.TsStep,
+// 		Payload: data.Payload,
+// 	}
 
-	return dBaseline
-}
+// 	return dBaseline
+// }
 
 /**
  * Merge data from different data source with consistent time idx
  * mode:
  */
 func (mb *MemBuff) Merge(mode int, dataName ...string) *types.Data {
-	dataMerge := types.Data{
-		Meta: &types.PropMeta{
-			Name: "Merge"},
-		Ts: mb.BuffTs[dataName[0]],
-	}
+	// dataMerge := types.Data{
+	// 	Meta: &types.PropMeta{
+	// 		Name: "Merge"},
+	// 	Ts: mb.BuffTs[dataName[0]],
+	// }
 
-	for _, name := range dataName {
-		dataBuff := mb.Buff[name]
-		dataTs := mb.BuffTs[name]
-	}
+	// for _, name := range dataName {
+	// 	dataBuff := mb.Buff[name]
+	// 	dataTs := mb.BuffTs[name]
+	// }
 	// stData := make(map[string]*types.Data)
 	// dimenData := make(map[string]int)
 	// for _, name := range dataName {

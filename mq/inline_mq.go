@@ -15,7 +15,7 @@ func (m *InlineMq) Publish(topic string, msg string) {
 }
 
 func (m *InlineMq) Pull(topic string) chan []byte {
-	return m.stream[topic]
+	return m.streams[topic]
 }
 
 func (m *InlineMq) Push(topic string, bs []byte) {

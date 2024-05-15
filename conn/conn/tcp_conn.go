@@ -5,7 +5,6 @@ import (
 	"time"
 
 	// "github.com/lingfliu/ucs_core/cfg"
-	"github.com/lingfliu/ucs_core/cfg"
 	"github.com/lingfliu/ucs_core/utils"
 )
 
@@ -106,7 +105,7 @@ func (conn *TcpConn) Write(bs []byte) int {
 	}
 	n, err := conn.c.Write(bs)
 	if err != nil {
-		cfg.GetULogger().Info("write failed " + err.Error())
+		// log.GetULogger().I("write failed " + err.Error())
 		return -1
 	} else {
 		return n
@@ -120,7 +119,7 @@ func (conn *TcpConn) ScheduledWrite(bs []byte) {
 func (conn *TcpConn) Connect() int {
 	c, err := net.DialTimeout("tcp", conn.RemoteAddr, time.Duration(conn.Timeout)*time.Millisecond)
 	if err != nil {
-		cfg.GetULogger().Err("connect error: " + err.Error())
+		// cfg.GetULogger().E("connect error: " + err.Error())
 		conn.State = CONN_STATE_DISCONNECTED
 		conn.c = nil
 

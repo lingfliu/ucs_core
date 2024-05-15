@@ -4,6 +4,7 @@ type DataDispatch struct {
 	// 用于存储数据的通道
 	source       chan byte
 	dispatchChan chan map[string]chan byte
+	membuff      Membuff
 }
 
 func NewDataDispatch(source chan byte) *DataDispatch {
@@ -13,8 +14,13 @@ func NewDataDispatch(source chan byte) *DataDispatch {
 	}
 }
 
-func (dd *DataDispatch) Reg(name string, ch chan byte) {
-	dd.dispatchChan <- map[string]chan byte{name: ch}
+func (dd *DataDispatch) Reg(names []string, ch chan byte) {
+	// dd.dispatchChan <- map[string]chan byte
+}
+
+func (dd *DataDispatch) Unreg(name string) {
+	//remove the channel from the map
+	dd.dispatchChan <- map[string]chan byte{name: nil}
 }
 
 func (dd *DataDispatch) Run() {
@@ -26,11 +32,6 @@ func (dd *DataDispatch) Run() {
 			}
 		}
 	}
-}
-
-func (dd *DataDispatch) Unreg(name string) {
-	//remove the channel from the map
-	dd.dispatchChan <- map[string]chan byte{name: nil}
 }
 
 func (dd *DataDispatch) Close() {

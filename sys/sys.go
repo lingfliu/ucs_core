@@ -17,8 +17,8 @@ func NewDefaultSys() *Sys {
  * @param tpl
  */
 func (s *Sys) RegServer(name string, port int, connMode int) {
-	s.servers[name] = srv.NewServer(name, port, connMode)
-	s.servers[name].Start()
+	// s.servers[name] = srv.NewServer(name, port, connMode)
+	// s.servers[name].Start()
 }
 
 func (s *Sys) Start() {

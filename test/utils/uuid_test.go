@@ -3,7 +3,7 @@ package test
 import (
 	"testing"
 
-	"issc.io/mmitp/mmitp-core/utils"
+	"github.com/lingfliu/ucs_core/utils"
 )
 
 func anyDuplicate(ids []string) bool {
