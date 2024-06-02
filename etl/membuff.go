@@ -120,3 +120,18 @@ func calcTsBaseline(tsStep int64) (int64, int64) {
 
 	return tsBaseline, idx
 }
+
+func (mb *MemBuff) Reg(name string, buffdimen int, bufflen int) int {
+	//if name is in the keys of Buff
+	if _, ok := mb.Buff[name]; ok {
+		// mb.Buff[name] = make([]float64, bufflen)
+		return 0
+	} else {
+		//duplicate reg, return err
+		return -1
+	}
+}
+
+func (mb *MemBuff) Unreg(name string) {
+	delete(mb.Buff, name)
+}
