@@ -141,10 +141,10 @@ func (rb *ByteRingBuffer) Peek(bs []byte, n int) int {
 	if n > rb.l {
 		return -1 //over pop not supported
 	}
+
 	if n > len(bs) {
 		n = len(bs)
-	}
-	if rb.Capacity < n {
+	} else if rb.Capacity < n {
 		n = rb.Capacity
 	}
 

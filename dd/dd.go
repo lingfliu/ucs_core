@@ -2,24 +2,24 @@ package dd
 
 type Dd struct {
 	// 用于存储数据的通道
-	Source  chan byte
-	Streams map[string]chan byte
+	SrcStream   chan byte
+	DistStreams map[string]*DdSubStream
 }
 
 func NewDd(source chan byte) *Dd {
 	return &Dd{
-		Source:  source,
-		Streams: make(map[string]chan byte),
+		SrcStream:   source,
+		DistStreams: make(map[string]*DdSubStream),
 	}
 }
 
 func (dd *Dd) RegStream(name string) {
-	dd.Streams[name] = make(chan byte)
+	dd.DistStreams[name] = make(*DdSubStream)
 }
 
 func (dd *Dd) UnregStream(name string) {
 	//remove the channel from the map
-	delete(dd.Streams, name)
+	delete(dd.SubStreams, name)
 }
 
 func (dd *Dd) Run() {
