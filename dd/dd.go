@@ -14,29 +14,29 @@ func NewDd(source chan byte) *Dd {
 }
 
 func (dd *Dd) RegStream(name string) {
-	dd.DistStreams[name] = make(*DdSubStream)
+	// dd.DistStreams[name] = make(*DdSubStream)
 }
 
 func (dd *Dd) UnregStream(name string) {
 	//remove the channel from the map
-	delete(dd.SubStreams, name)
+	// delete(dd.SubStreams, name)
 }
 
 func (dd *Dd) Run() {
-	for range dd.Source {
-		select {
-		case data := <-dd.Source:
-			for _, stream := range dd.Streams {
-				stream <- data
-			}
-		}
+	// for range dd.Source {
+	// 	select {
+	// 	case data := <-dd.Source:
+	// 		for _, stream := range dd.Streams {
+	// 			stream <- data
+	// 		}
+	// 	}
 
-	}
+	// }
 }
 
 func (dd *Dd) Close() {
 	//TODO: remove all streams and close the source
-	for _, stream := range dd.Streams {
-		close(stream)
-	}
+	// for _, stream := range dd.Streams {
+	// 	close(stream)
+	// }
 }
