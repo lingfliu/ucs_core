@@ -4,6 +4,9 @@ import (
 	"sync"
 )
 
+/**
+ * A simple byte buffer wrapper
+ */
 type ByteArrayRingBuffer struct {
 	buff [][]byte
 	l    int //buffer length

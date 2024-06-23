@@ -4,14 +4,13 @@ import (
 	"net"
 	"time"
 
-	// "github.com/lingfliu/ucs_core/cfg"
 	"github.com/lingfliu/ucs_core/utils"
 )
 
 /**
  * TcpConn wrapper with improved read & write behavior
- * note: TcpConn only handle bytes read & write, connection state and decode are controlled by the tcp_conn_cli
- * method: ReadToBuff, Read, Write, ScheduledWrite, Connect, Run, Disconnect
+ * note: TcpConn only handle bytes read & write, connection state and decode are controlled by cli
+ * method: Write, ScheduledWrite, Connect, Run, Disconnect
  */
 type TcpConn struct {
 	BaseConn
@@ -22,7 +21,11 @@ type TcpConn struct {
 }
 
 func NewTcpConn(localAddr string, remoteAddr string, keepAlive bool, timeout int64, timeoutRw int64) *TcpConn {
-	var c = &TcpConn{
+	if localAddr == "" {
+		localAddr = "127.0.0.1"
+	}
+
+	c := &TcpConn{
 		BaseConn: BaseConn{
 			LocalAddr:  localAddr,
 			RemoteAddr: remoteAddr,
@@ -32,7 +35,7 @@ func NewTcpConn(localAddr string, remoteAddr string, keepAlive bool, timeout int
 			State:      CONN_STATE_DISCONNECTED,
 			Class:      CONN_CLASS_TCP,
 		},
-		recv_buff: utils.NewByteArrayRingBuffer(32, 2048),
+		recv_buff: utils.NewByteArrayRingBuffer(10, 2048),
 		send_buff: make([][]byte, 0),
 	}
 	return c
@@ -44,7 +47,7 @@ func (conn *TcpConn) taskRead() {
 	tick := time.NewTicker(100 * time.Microsecond)
 	for conn.State == CONN_STATE_CONNECTED {
 		for range tick.C {
-			buff, n = conn.ReadToBuff()
+			buff, n = conn.Read()
 			if n > 0 {
 				if conn.OnRecv != nil {
 					conn.OnRecv(buff, n)
@@ -73,32 +76,23 @@ func (conn *TcpConn) taskWrite() {
 	}
 }
 
-func (conn *TcpConn) ReadToBuff() ([]byte, int) {
+func (conn *TcpConn) Read() ([]byte, int) {
 	buff := conn.recv_buff.Next()
-	conn.c.SetReadDeadline(time.Now().Add(time.Duration(conn.TimeoutRw) * time.Millisecond))
-	n, _ := conn.c.Read(buff)
-	if n > 0 {
-		return buff, n
-	} else {
-		return nil, 0
-	}
-}
-
-func (conn *TcpConn) Read(bs []byte) int {
+	//set ddl for every read
 	err := conn.c.SetReadDeadline(time.Now().Add(time.Duration(conn.TimeoutRw) * time.Millisecond))
 	if err != nil {
-		return 0
+		return nil, 0
 	}
-	n, _ := conn.c.Read(bs)
-	if (n > 0) && (conn.OnRecv != nil) {
-		return n
+
+	n, err := conn.c.Read(buff)
+	if err != nil {
+		return nil, 0
 	} else {
-		return 0
+		return buff, n
 	}
 }
 
 func (conn *TcpConn) Write(bs []byte) int {
-
 	err := conn.c.SetWriteDeadline(time.Now().Add(time.Duration(conn.TimeoutRw) * time.Millisecond))
 	if err != nil {
 		return 0
@@ -116,36 +110,34 @@ func (conn *TcpConn) ScheduledWrite(bs []byte) {
 	conn.send_buff = append(conn.send_buff, bs)
 }
 
-func (conn *TcpConn) Connect() int {
+/*
+ * called in io routines
+ */
+func (conn *TcpConn) Connect(state chan int) int {
+	res := 0
+	conn.State = CONN_STATE_CONNECTING
 	c, err := net.DialTimeout("tcp", conn.RemoteAddr, time.Duration(conn.Timeout)*time.Millisecond)
 	if err != nil {
-		// cfg.GetULogger().E("connect error: " + err.Error())
 		conn.State = CONN_STATE_DISCONNECTED
 		conn.c = nil
-
-		if conn.OnStateChanged != nil {
-			conn.OnStateChanged(CONN_STATE_DISCONNECTED)
-		}
-
-		return -1
+		res = -1
 	} else {
 		conn.c = c.(*net.TCPConn)
-
 		//set tcp as nodelay
 		conn.c.SetNoDelay(true)
 		conn.c.SetLinger(0)
 		conn.c.SetWriteBuffer(0)
 		conn.c.SetReadBuffer(0)
-
 		//initialize tcp state
 		conn.State = CONN_STATE_CONNECTED
 		conn.ConnectedAt = utils.CurrentTime()
-
-		if conn.OnStateChanged != nil {
-			conn.OnStateChanged(CONN_STATE_CONNECTED)
-		}
-		return 0
+		res = 0
 	}
+
+	if conn.OnStateChanged != nil {
+		conn.OnStateChanged(conn.State)
+	}
+	return res
 }
 
 /**
@@ -161,18 +153,27 @@ func (conn *TcpConn) Run() {
 /**
  * Disconnect whenever the op is successful or not
  */
-func (conn *TcpConn) Disconnect() int {
+func (conn *TcpConn) Disconnect(state chan int) {
 	conn.State = CONN_STATE_DISCONNECTED
 	conn.DisconnectAt = utils.CurrentTime()
 
-	if conn.OnStateChanged != nil {
-		conn.OnStateChanged(CONN_STATE_DISCONNECTED)
-	}
-
 	err := conn.c.Close()
 	if err != nil {
-		return -1
-	} else {
-		return 0
+		// log.GetULogger().I("close failed " + err.Error())
+		// simply delete the connection
+		conn.c = nil
+	}
+
+	state <- CONN_STATE_CONNECTED
+}
+
+func (conn *TcpConn) taskState(state chan int) {
+	for {
+		select {
+		case s := <-state:
+			if s == CONN_STATE_DISCONNECTED {
+				// reconnect after 1s
+			}
+		}
 	}
 }

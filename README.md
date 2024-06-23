@@ -2,32 +2,33 @@
 
 ## Framework
 ```
-conn           connection engine
-    | conn      
-    | coder    data protocol coder
-    | srv      workflow handling
+admin: web pages for administration
+conn: connection services
+    | conn      collection of different connection protocols 
+    | coder     data protocol coder
 data           
-    | model    data modeling
-    | orm      orm accessor
-    | olap     space-time olap
-    | stats    stats aggregate
-    | file     object-relationship file service
-    | export   data2file export
-etl
+    | file      minio
+    | orm       mysql & mongodb
+    | buff      redis
+    | olap      space-time olap
+    | stats     data aggregation
+    | export    data2file export (to be merged)
+etl: data processing
+    | flink     flink computing 
     | membuff
-    | st_slice  spatial-temporal data formatting
-    | flow      Flink based stream computation
-dd              data distribution
-    | packet    no-RT msg dispatching
-    | stream    data stream distribution (RT DD)
-    | mapping   convert stream to another
-mq              message queue
-alg
-    alg         algorithm wrapper
-    algNode     alg node server
-    node_mgr    alg node server manager (load balance, reverse proxy)
-utils           tools
+    | st_op     spatial-temporal data handling (format, aggregate)
+    | mapping   stream data mapping
+dd              data distribution services
+    | rtdb      agilor
+    | rtps      dds / rtps
+    | tunneling redirect
+mq              
 cfg             service, log, tmp output config
+types:          data models
+ulog:           logging tools
+utils           tools
+test            
+func_test:      function tests
 scripts         script for database, mq deployment
 ```
 ## How to install
