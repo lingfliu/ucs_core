@@ -42,35 +42,27 @@ func NewTcpConn(localAddr string, remoteAddr string, keepAlive bool, timeout int
 }
 
 func (conn *TcpConn) taskRead() {
-	var n int
-	var buff []byte
-	tick := time.NewTicker(100 * time.Microsecond)
+
+	// tick := time.NewTicker(100 * time.Microsecond)
 	for conn.State == CONN_STATE_CONNECTED {
-		for range tick.C {
-			buff, n = conn.Read()
-			if n > 0 {
-				if conn.OnRecv != nil {
-					conn.OnRecv(buff, n)
-				}
-			}
-		}
+
+		// for range tick.C {
+		// 	// buff, n = conn.Read()
+		// 	// if n > 0 {
+		// 	// 	if conn.OnRecv != nil {
+		// 	// 		conn.OnRecv(buff, n)
+		// 	// 	}
+		// 	// }
+		// }
 	}
 }
 
 func (conn *TcpConn) taskWrite() {
-	var n int
 	tick := time.NewTicker(100 * time.Microsecond)
 	for conn.State == CONN_STATE_CONNECTED {
 		for range tick.C {
 			for len(conn.send_buff) > 0 {
 				//TODO: replace send_buff with a FIFO queue
-				n = conn.Write(conn.send_buff[0])
-				if n > 0 {
-					if conn.OnSent != nil {
-						conn.OnSent(conn.send_buff[0], n)
-					}
-					conn.send_buff = conn.send_buff[1:]
-				}
 			}
 		}
 	}
@@ -134,9 +126,6 @@ func (conn *TcpConn) Connect(state chan int) int {
 		res = 0
 	}
 
-	if conn.OnStateChanged != nil {
-		conn.OnStateChanged(conn.State)
-	}
 	return res
 }
 

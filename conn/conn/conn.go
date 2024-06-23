@@ -32,10 +32,10 @@ type BaseConn struct {
 	ConnectedAt  int64
 	Class        string //tcp, quic, http, mqtt, rtsp
 
-	//callbacks
-	OnRecv         func(bs []byte, n int)
-	OnSent         func(bs []byte, n int)
-	OnStateChanged func(state int)
+	// callbacks
+	// OnRecv         func(bs []byte, n int)
+	// OnSent         func(bs []byte, n int)
+	// OnStateChanged func(state int)
 }
 
 type Conn interface {
