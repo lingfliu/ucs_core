@@ -1,37 +1,76 @@
 package coder
 
-import "encoding/json"
+type JsonMsg string
 
-type Msg struct {
-	Class     int
-	Metas     map[string]*MsgAttr
-	Payloads  map[string]*MsgAttr
-	Timestamp int64
+// func (msg *Msg) GetAttrVals(name string) []any {
+// 	var attr *MsgAttr
+// 	if msg.Metas[name] != nil {
+// 		attr = msg.Metas[name]
+// 	} else {
+// 		attr = msg.Payloads[name]
+// 	}
+// 	return attr.Vals
+// }
+
+// func (msg *Msg) ToBytes() string {
+// 	bs, err := json.Marshal(msg)
+// 	if err != nil {
+// 		return ""
+// 	}
+// 	return string(bs)
+// }
+
+const (
+	MSG_ATTR_CLASS_INT       = 0
+	MSG_ATTR_CLASS_FLOAT     = 1
+	MSG_ATTR_CLASS_STR_ASCII = 2
+	MSG_ATTR_CLASS_STR_UTF8  = 2
+	MSG_ATTR_CLASS_BOOL      = 3
+)
+
+type MsgAttrSpec struct {
+	Class    int
+	Size     int    //>1 if array
+	Encoding string //for string
 }
 
-type MsgAttr struct {
-	Name string
+type MsgSpec struct {
+	MsgClass int //msg class
+	//metas
+	Meta map[string]*MsgAttrSpec
 
-	//container for different types of value
-	ValClass int
-	Vals     []any
+	//payloads
+	Payload map[string]*MsgAttrSpec
 }
 
-func (msg *Msg) GetAttrVals(name string) []any {
-	var attr *MsgAttr
-	if msg.Metas[name] != nil {
-		attr = msg.Metas[name]
-	} else {
-		attr = msg.Payloads[name]
-	}
-	return attr.Vals
+type Msg interface {
+	ToBytes() []byte
+	ToJson() string
+	GetVal(name string) any
+	GetMeta(name string) any
+	GetClass() int
 }
 
-func (msg *Msg) ToString() string {
-	bs, err := json.Marshal(msg)
-	if err != nil {
-		return ""
-	}
+type UMsg struct {
+	Name    string
+	Class   int
+	Meta    map[string]any
+	Payload map[string]any
+}
 
-	return string(bs)
+func (msg *UMsg) ToBytes() []byte {
+	return make([]byte, 1)
+}
+
+func (msg *UMsg) ToJson() string {
+	//marshall
+	return ""
+}
+
+func (msg *UMsg) GetVal(name string) any {
+	return msg.Payload[name]
+}
+
+func (msg *UMsg) GetMeta(name string) any {
+	return msg.Meta[name]
 }

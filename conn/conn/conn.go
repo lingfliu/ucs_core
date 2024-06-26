@@ -39,6 +39,8 @@ type BaseConn struct {
 }
 
 type Conn interface {
+	RemoteAddr() string
+
 	Run()
 
 	Read(bs []byte) int

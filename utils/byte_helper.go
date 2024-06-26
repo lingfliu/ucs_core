@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"encoding/binary"
+	"math"
 	"strconv"
+	"strings"
 )
 
 /**
@@ -117,4 +120,79 @@ func BytesEqual(a, b []byte) bool {
 		}
 	}
 	return true
+}
+
+func Float2Byte(x float32, bs []byte, offset int, msb bool) {
+	bits := math.Float32bits(x)
+	if msb {
+		binary.BigEndian.PutUint32(bs[offset:], bits)
+	} else {
+		binary.LittleEndian.PutUint32(bs[offset:], bits)
+	}
+}
+
+func Byte2Float(bs []byte, offset int, msb bool) float32 {
+	bits := uint32(0)
+	if msb {
+		bits = binary.BigEndian.Uint32(bs[offset:])
+	} else {
+		bits = binary.LittleEndian.Uint32(bs[offset:])
+	}
+	return math.Float32frombits(bits)
+}
+
+func Double2Byte(x float64, bs []byte, offset int, msb bool) {
+	bits := math.Float64bits(x)
+	if msb {
+		binary.BigEndian.PutUint64(bs[offset:], bits)
+	} else {
+		binary.LittleEndian.PutUint64(bs[offset:], bits)
+	}
+}
+
+func Byte2Double(bs []byte, offset int, msb bool) float64 {
+	bits := uint64(0)
+	if msb {
+		bits = binary.BigEndian.Uint64(bs[offset:])
+	} else {
+		bits = binary.LittleEndian.Uint64(bs[offset:])
+	}
+	return math.Float64frombits(bits)
+}
+
+/*
+*
+* insert bool onto a byte
+@param blen bit position (0-7)
+*/
+func Bool2Byte(x bool, bs []byte, offset int, blen int) {
+	if x {
+		bs[offset] |= 1 << blen
+	} else {
+		bs[offset] &= 0 << blen
+	}
+}
+
+func Byte2Bool(bs []byte, offset int, blen int) bool {
+	x := bs[offset] & (1 << blen)
+	if x > 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func String2Byte(s string, bs []byte, offset int, strlen int) {
+	l := strings.Count(s, "") - 1
+	if l > strlen {
+		//truncate string
+		ss := s[:strlen]
+		copy(bs[offset:], []byte(ss))
+	} else {
+		copy(bs[offset:], []byte(s))
+	}
+}
+
+func Byte2String(bs []byte, offset int, strlen int) string {
+	return string(bs[offset : offset+strlen])
 }

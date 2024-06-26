@@ -1,11 +1,6 @@
 package sys
 
-import (
-	"github.com/lingfliu/ucs_core/conn/srv"
-)
-
 type Sys struct {
-	servers map[string]srv.Server
 }
 
 func NewDefaultSys() *Sys {

@@ -10,7 +10,7 @@ import (
 /**
  * TcpConn wrapper with improved read & write behavior
  * note: TcpConn only handle bytes read & write, connection state and decode are controlled by cli
- * method: Write, ScheduledWrite, Connect, Run, Disconnect
+ * method: Read, ReadToBuff, Write, ScheduledWrite, Connect, Run, Disconnect
  */
 type TcpConn struct {
 	BaseConn
@@ -18,6 +18,10 @@ type TcpConn struct {
 	c         *net.TCPConn
 	recv_buff *utils.ByteArrayRingBuffer
 	send_buff [][]byte
+
+	state chan int
+	recv  chan []byte
+	send  chan []byte
 }
 
 func NewTcpConn(localAddr string, remoteAddr string, keepAlive bool, timeout int64, timeoutRw int64) *TcpConn {
@@ -37,8 +41,18 @@ func NewTcpConn(localAddr string, remoteAddr string, keepAlive bool, timeout int
 		},
 		recv_buff: utils.NewByteArrayRingBuffer(10, 2048),
 		send_buff: make([][]byte, 0),
+
+		state: make(chan int),
+		recv:  make(chan []byte),
+		send:  make(chan []byte),
 	}
 	return c
+}
+
+func (conn *TcpConn) Subscribe(recv chan []byte, send chan []byte, state chan int) {
+	conn.recv = recv
+	conn.send = send
+	conn.state = state
 }
 
 func (conn *TcpConn) taskRead() {
