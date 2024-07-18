@@ -29,16 +29,27 @@ func NewByteArrayRingBuffer(ring_size int, buff_size int) *ByteArrayRingBuffer {
 	return rb
 }
 
-func (rb *ByteArrayRingBuffer) Curr() []byte {
-	return rb.buff[rb.c]
+func (rb *ByteArrayRingBuffer) Push(bs []byte) {
 }
 
-func (rb *ByteArrayRingBuffer) Next() []byte {
-	if rb.c == rb.l-1 {
-		rb.c = 0
-	} else {
-		rb.c++
-	}
-
-	return rb.buff[rb.c]
+func (rb *ByteArrayRingBuffer) Pop() []byte {
+	return nil
 }
+
+func (rb *ByteArrayRingBuffer) Len() int {
+	return 0
+}
+
+// func (rb *ByteArrayRingBuffer) Curr() []byte {
+// 	return rb.buff[rb.c]
+// }
+
+// func (rb *ByteArrayRingBuffer) Next() []byte {
+// 	if rb.c == rb.l-1 {
+// 		rb.c = 0
+// 	} else {
+// 		rb.c++
+// 	}
+
+// 	return rb.buff[rb.c]
+// }
