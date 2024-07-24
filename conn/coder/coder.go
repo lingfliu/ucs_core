@@ -29,7 +29,7 @@ type CodeAttrSpec struct {
 type CodeMsgSpec struct {
 	Name        string
 	Class       int
-	MetaList    []*CodeAttrSpec //
+	MetaList    []*CodeAttrSpec //msg spec meta
 	PayloadList []*CodeAttrSpec
 	Varlen      bool //if the msg has variable payload length
 }

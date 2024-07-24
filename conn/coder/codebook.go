@@ -1,6 +1,11 @@
 package coder
 
-import "github.com/lingfliu/ucs_core/utils"
+import (
+	"encoding/json"
+
+	"github.com/lingfliu/ucs_core/ulog"
+	"github.com/lingfliu/ucs_core/utils"
+)
 
 type Codebook struct {
 	Header           []byte
@@ -8,9 +13,24 @@ type Codebook struct {
 	HasTail          bool
 	HasPayload       bool
 	MetaList         []*CodeAttrSpec
-	MsgList          []*CodeMsgSpec
+	MsgSet           map[int]*CodeMsgSpec
 	Checksum         string
 	MsgClassAttrSpec *CodeAttrSpec
+}
+
+func NewCodebookFromJson(jsonStr string) *Codebook {
+	var codebook *Codebook
+	json.Unmarshal([]byte(jsonStr), &codebook)
+	if codebook == nil {
+		ulog.GetULogger().I("codebook", "json unmarshal failed")
+		return nil
+	}
+	if codebook.Validate() != "passed" {
+		ulog.GetULogger().I("codebook", "validation failed")
+		return nil
+	} else {
+		return codebook
+	}
 }
 
 func (cb *Codebook) GetMetaSpec(name string) *CodeAttrSpec {
@@ -23,12 +43,8 @@ func (cb *Codebook) GetMetaSpec(name string) *CodeAttrSpec {
 }
 
 func (cb *Codebook) GetMsgSpec(class int) *CodeMsgSpec {
-	for _, spec := range cb.MsgList {
-		if spec.Class == class {
-			return spec
-		}
-	}
-	return nil
+	spec, ok := cb.MsgSet[class]
+	return spec
 }
 
 /**

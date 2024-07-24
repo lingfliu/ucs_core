@@ -25,8 +25,11 @@ func (coder *UCoder) Reset() {
 }
 
 func (coder *UCoder) PushDecode(bs []byte, n int) *UMsg {
+
 	foundHeader := false
 	coder.buff.Push(bs, n)
+
+	//header matching
 	for coder.buff.Capacity > len(coder.Codebook.Header) {
 		//peek till the position of msg class meta
 		coder.buff.Peek(coder._buff, len(coder.Codebook.Header))
