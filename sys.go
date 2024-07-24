@@ -1,4 +1,4 @@
-package sys
+package main
 
 type Sys struct {
 }
