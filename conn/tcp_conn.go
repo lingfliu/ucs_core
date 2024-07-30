@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -10,8 +11,7 @@ import (
 
 type TcpConn struct {
 	BaseConn
-	c    *net.TCPConn
-	Mode int // 0 for client, 1 for server
+	c *net.TCPConn
 
 	OnConnected    func()
 	OnDisconnected func()
@@ -28,6 +28,8 @@ func NewTcpConn(remoteAddr string, port int) *TcpConn {
 			Port:       port,
 			Class:      CONN_CLASS_TCP,
 		},
+		RxBuff: utils.NewByteRingBuffer(1024),
+		TxBuff: utils.NewByteArrayRingBuffer(32, 1024),
 	}
 	return c
 }
@@ -36,75 +38,64 @@ func (c *TcpConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	tcp, err := net.DialTimeout("tcp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
 	if err != nil {
-		ulog.Log().I("tcpconn", "connect to %s:%d failed", c.RemoteAddr, c.Port)
+		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
 	}
 
 	c.State = CONN_STATE_CONNECTED
+	c.c = tcp.(*net.TCPConn)
+
+	go c._task_recv()
+	go c._task_send()
+	return 0
+}
+
+func (c *TcpConn) Establish(tcp *net.TCPConn) int {
+	c.State = CONN_STATE_CONNECTED
 	c.c = tcp
 
-	c.StartRecv()
-	c.StartSend()
+	go c._task_recv()
+	go c._task_send()
 	return 0
 }
 
 func (c *TcpConn) Disconnect() int {
 	if c.c != nil {
 		c.c.Close()
+		//TODO: finish rx & tx
 		c.State = CONN_STATE_DISCONNECTED
 	}
 	return 0
 }
 
-func (c *TcpConn) StartRecv() {
-	buf := make([]byte, 1024)
-	for c.State == CONN_STATE_CONNECTED {
-		n, err := c.c.Read(buf)
+func (c *TcpConn) _task_recv() {
+	buff := make([]byte, 1024)
+	for {
+		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		n, err := c.c.Read(buff)
+
 		if err != nil {
+			//TODO: handling disconnect
+			// return -1
 			c.Disconnect()
-			break
 		}
-
-		rx <- buf[:n]
-	}
-}
-
-func (c *TcpConn) StartSend() {
-	for c.State == CONN_STATE_CONNECTED {
-		select {
-		case buf := <-tx:
-			_, err := c.c.Write(buf)
-			if err != nil {
-				c.Disconnect()
-				break
-			}
+		if n > 0 {
+			c.RxBuff.Push(buff, n)
 		}
 	}
 }
 
-func (c *TcpConn) Read() int {
-	n, err := c.c.Read(c.RxBuff)
-	if err != nil {
-		//read error, break the connection
-		c.Disconnect()
-		return -1
-	}
-
-	return n
-}
-
-func (c *TcpConn) ReadTo(buff []byte) int {
-	n, err := c.c.Read(buff)
-	if err != nil {
-		//read error, break the connection
-		c.Disconnect()
-		return -1
-	}
-	return n
+func (c *TcpConn) Read(buff []byte) int {
+	return 0
 }
 
 func (c *TcpConn) InstantWrite(buff []byte) int {
+	err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	if err != nil {
+		c.Disconnect()
+	}
+
 	n, err := c.c.Write(buff)
 	if err != nil {
 		//write error, break the connection
@@ -116,4 +107,28 @@ func (c *TcpConn) InstantWrite(buff []byte) int {
 
 func (c *TcpConn) ScheduleWrite(buff []byte) {
 	c.TxBuff.Push(buff)
+}
+
+func (c *TcpConn) _task_send() {
+	for c.State == CONN_STATE_CONNECTED {
+		buff := c.TxBuff.Pop()
+		if buff == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+
+		err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		if err != nil {
+			c.Disconnect()
+		}
+
+		_, err = c.c.Write(buff)
+		if err != nil {
+			//TODO: handle write error
+			c.Disconnect()
+		}
+
+		//TODO: handle write success
+		// return n
+	}
 }

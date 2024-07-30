@@ -18,32 +18,40 @@ const CONN_CLASS_RTSP string = "rtsp"
 // conn bases
 // ********************************************************
 type BaseConn struct {
-	State        int
-	KeepAlive    bool  // by default true
-	Timeout      int64 // connect timeout
-	TimeoutRw    int64 // read write timeout
-	LocalAddr    string
-	RemoteAddr   string
-	Port         int
-	DisconnectAt int64
-	ConnectedAt  int64
-	Class        string //tcp, quic, http, mqtt, rtsp
+	State      int
+	KeepAlive  bool  // by default true
+	Timeout    int64 // connect timeout
+	TimeoutRw  int64 // read write timeout
+	LocalAddr  string
+	RemoteAddr string
+	Port       int
+	Class      string //tcp, quic, http, mqtt, rtsp
+
 }
 
-type ConnCli interface {
-	Disconnect() int
-	Connect() int
+type Conn interface {
+	Connect()
+	Establish(conn BaseConn)
+	Disconnect()
 
-	StartRecv(rx chan []byte)
-	StartSend(tx chan []byte)
+	ScheduleWrite([]byte)
+	InstantWrite([]byte)
 }
 
-type ConnSrv interface {
-	Listen() int
-	Disconnect() int
+// type ConnCli interface {
+// 	Disconnect() int
+// 	Connect() int
 
-	StartRecv(rx chan []byte)
-	StartSend(tx chan []byte)
+// 	StartRecv(rx chan []byte)
+// 	StartSend(tx chan []byte)
+// }
 
-	Cleanup()
-}
+// type ConnSrv interface {
+// 	Listen() int
+// 	Disconnect() int
+
+// 	StartRecv(rx chan []byte)
+// 	StartSend(tx chan []byte)
+
+// 	Cleanup()
+// }
