@@ -20,22 +20,3 @@ func (c *Coder) PutBytes(bs []byte) {
 
 func (c *Coder) Encode() {
 }
-
-type ConnCli struct {
-	coder Coder
-	conn  Conn
-}
-
-func (c *ConnCli) Connect() {
-}
-
-func (c *ConnCli) Disconnect() {
-
-}
-
-func (c *ConnCli) _task_read() {
-	for {
-		bf := c.conn.ReadToBuff()
-		c.coder.PutBytes(bf)
-	}
-}

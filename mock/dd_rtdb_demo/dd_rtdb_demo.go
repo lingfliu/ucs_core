@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/lingfliu/ucs_core/data/rtdb"
+	"github.com/lingfliu/ucs_core/dd"
 )
 
 func main() {
@@ -9,6 +10,8 @@ func main() {
 
 	go rtdb.Connect()
 
-	// dd := &dd.InmemDd{}
+	memDd := &dd.MemDd{}
+
+	memDd.Listen()
 
 }

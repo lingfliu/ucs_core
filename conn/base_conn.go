@@ -14,12 +14,8 @@ const CONN_CLASS_HTTP string = "http"
 const CONN_CLASS_MQTT string = "mqtt"
 const CONN_CLASS_RTSP string = "rtsp"
 
-// srv state
-const SRV_STATE_ON = 0
-const SRV_STATE_OFF = 1
-
 // ********************************************************
-// conn
+// conn bases
 // ********************************************************
 type BaseConn struct {
 	State        int
@@ -28,28 +24,26 @@ type BaseConn struct {
 	TimeoutRw    int64 // read write timeout
 	LocalAddr    string
 	RemoteAddr   string
+	Port         int
 	DisconnectAt int64
 	ConnectedAt  int64
 	Class        string //tcp, quic, http, mqtt, rtsp
-
-	// callbacks
-	// OnRecv         func(bs []byte, n int)
-	// OnSent         func(bs []byte, n int)
-	// OnStateChanged func(state int)
 }
 
-type Conn interface {
-	RemoteAddr() string
-
-	Run()
-
-	Read(bs []byte) int
-	ReadToBuff() []byte
-	Write(bs []byte) int
-	ScheduleWrite(bs []byte)
+type ConnCli interface {
 	Disconnect() int
 	Connect() int
 
-	taskRead()
-	taskWrite()
+	StartRecv(rx chan []byte)
+	StartSend(tx chan []byte)
+}
+
+type ConnSrv interface {
+	Listen() int
+	Disconnect() int
+
+	StartRecv(rx chan []byte)
+	StartSend(tx chan []byte)
+
+	Cleanup()
 }
