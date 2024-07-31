@@ -9,18 +9,18 @@ import (
 	"github.com/lingfliu/ucs_core/utils"
 )
 
-type TcpConn struct {
+type UdpConn struct {
 	BaseConn
-	c *net.TCPConn
+	c *net.UDPConn
 }
 
-func NewTcpConn(remoteAddr string, port int) *TcpConn {
+func NewUdpConn(remoteAddr string, port int) *TcpConn {
 	c := &TcpConn{
 		BaseConn: BaseConn{
 			State:      CONN_STATE_DISCONNECTED,
 			RemoteAddr: remoteAddr,
 			Port:       port,
-			Class:      CONN_CLASS_TCP,
+			Class:      CONN_CLASS_UDP,
 			RxBuff:     utils.NewByteRingBuffer(1024),
 			TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
 		},
@@ -28,11 +28,11 @@ func NewTcpConn(remoteAddr string, port int) *TcpConn {
 	return c
 }
 
-func (c *TcpConn) Connect() int {
+func (c *UdpConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	tcp, err := net.DialTimeout("tcp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
+	udp, err := net.DialTimeout("udp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
 	if err != nil {
 		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
@@ -40,14 +40,14 @@ func (c *TcpConn) Connect() int {
 	}
 
 	c.State = CONN_STATE_CONNECTED
-	c.c = tcp.(*net.TCPConn)
+	c.c = udp.(*net.UDPConn)
 
 	go c._task_recv()
 	go c._task_send()
 	return 0
 }
 
-func (c *TcpConn) Disconnect() int {
+func (c *UdpConn) Disconnect() int {
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
 	if c.c != nil {
@@ -57,24 +57,19 @@ func (c *TcpConn) Disconnect() int {
 	return 0
 }
 
-func (c *TcpConn) Listen(ch chan *TcpConn) {
-	addr := net.TCPAddr{
+func (c *UdpConn) Listen(ch chan *UdpConn) {
+	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
 	}
-	l, err := net.ListenTCP("tcp", &addr)
-	if err != nil {
-		ulog.Log().E("tcpconn", "listen failed, check port")
-		c.Close()
-	}
-
 	for {
-		cc, err := l.Accept()
+		cc, err := net.ListenUDP("udp", &addr)
 		if err != nil {
-			ulog.Log().E("tcpconn", "accept failed, shutdown")
+			ulog.Log().E("tcpconn", "listen failed, check port")
+			c.Close()
 			break
 		}
-		tcp := &TcpConn{
+		udp := &UdpConn{
 			BaseConn: BaseConn{
 				State:      CONN_STATE_CONNECTED,
 				Class:      CONN_CLASS_TCP,
@@ -87,13 +82,13 @@ func (c *TcpConn) Listen(ch chan *TcpConn) {
 				RxBuff:     utils.NewByteRingBuffer(1024),
 				TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
 			},
-			c: cc.(*net.TCPConn),
+			c: cc,
 		}
-		ch <- tcp //TODO: test the channel for new conn handling
+		ch <- udp //TODO: test the channel for new conn handling
 	}
 }
 
-func (c *TcpConn) _task_recv() {
+func (c *UdpConn) _task_recv() {
 	buff := make([]byte, 1024)
 	for {
 		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
@@ -109,11 +104,11 @@ func (c *TcpConn) _task_recv() {
 	}
 }
 
-func (c *TcpConn) Read(buff []byte) int {
+func (c *UdpConn) Read(buff []byte) int {
 	return 0
 }
 
-func (c *TcpConn) InstantWrite(buff []byte) int {
+func (c *UdpConn) InstantWrite(buff []byte) int {
 	err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
 	if err != nil {
 		c.Disconnect()
@@ -128,11 +123,11 @@ func (c *TcpConn) InstantWrite(buff []byte) int {
 	return n
 }
 
-func (c *TcpConn) ScheduleWrite(buff []byte) {
+func (c *UdpConn) ScheduleWrite(buff []byte) {
 	c.TxBuff.Push(buff)
 }
 
-func (c *TcpConn) _task_send() {
+func (c *UdpConn) _task_send() {
 	for c.State == CONN_STATE_CONNECTED {
 		buff := c.TxBuff.Pop()
 		if buff == nil {
@@ -152,7 +147,7 @@ func (c *TcpConn) _task_send() {
 	}
 }
 
-func (c *TcpConn) _task_connect() {
+func (c *UdpConn) _task_connect() {
 	tic := time.NewTicker(time.Second * 1)
 	for c.State != CONN_STATE_CLOSE {
 		select {
@@ -164,7 +159,7 @@ func (c *TcpConn) _task_connect() {
 	}
 }
 
-func (c *TcpConn) Close() {
+func (c *UdpConn) Close() {
 	c.State = CONN_STATE_CLOSE
 	if c.c != nil {
 		c.c.Close()

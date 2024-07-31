@@ -1,18 +1,22 @@
 package conn
 
-const CONN_STATE_DISCONNECTED = 0
-const CONN_STATE_CONNECTING = 1
-const CONN_STATE_CONNECTED = 2
+import "github.com/lingfliu/ucs_core/utils"
 
-const CONN_CLASS_TCP string = "tcp"
-const CONN_CLASS_UDP string = "udp"
+const (
+	CONN_STATE_DISCONNECTED = 0
+	CONN_STATE_CONNECTING   = 1
+	CONN_STATE_CONNECTED    = 2
+	CONN_STATE_CLOSE        = 3
+
+	CONN_CLASS_TCP  string = "tcp"
+	CONN_CLASS_UDP  string = "udp"
+	CONN_CLASS_QUIC string = "quic"
+	CONN_CLASS_HTTP string = "http"
+	CONN_CLASS_MQTT string = "mqtt"
+	CONN_CLASS_RTSP string = "rtsp"
+)
 
 // const CONN_CLASS_kcp string = "kcp" //TODO: implement kcp
-const CONN_CLASS_QUIC string = "quic"
-const CONN_CLASS_HTTP string = "http"
-
-const CONN_CLASS_MQTT string = "mqtt"
-const CONN_CLASS_RTSP string = "rtsp"
 
 // ********************************************************
 // conn bases
@@ -27,31 +31,37 @@ type BaseConn struct {
 	Port       int
 	Class      string //tcp, quic, http, mqtt, rtsp
 
+	ReconnectAfter   int64
+	lastRecvAt       int64
+	lastConnectAt    int64
+	lastDisconnectAt int64
+
+	RxBuff *utils.ByteRingBuffer
+	TxBuff *utils.ByteArrayRingBuffer
+
+	//event
+	OnConnected    func()
+	OnDisconnected func()
 }
 
 type Conn interface {
 	Connect()
-	Establish(conn BaseConn)
 	Disconnect()
 
 	ScheduleWrite([]byte)
 	InstantWrite([]byte)
+
+	Listen()
+	Close()
 }
 
-// type ConnCli interface {
-// 	Disconnect() int
-// 	Connect() int
-
-// 	StartRecv(rx chan []byte)
-// 	StartSend(tx chan []byte)
-// }
-
-// type ConnSrv interface {
-// 	Listen() int
-// 	Disconnect() int
-
-// 	StartRecv(rx chan []byte)
-// 	StartSend(tx chan []byte)
-
-// 	Cleanup()
-// }
+type ConnCfg struct {
+	RemoteAddr     string
+	LocalAddr      string
+	Port           int
+	Class          string
+	KeepAlive      bool
+	ReconnectAfter int64
+	Timeout        int64
+	TimeoutRw      int64
+}

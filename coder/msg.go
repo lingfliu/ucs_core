@@ -35,7 +35,7 @@ type MsgAttrSpec struct {
 }
 
 type MsgSpec struct {
-	MsgClass int //msg class
+	Class int //msg class
 	//metas
 	Meta map[string]*MsgAttrSpec
 
