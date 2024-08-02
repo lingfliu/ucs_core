@@ -1,22 +1,21 @@
 package main
 
 import (
+	"context"
 	"sync"
-	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
 var wg sync.WaitGroup
 
+//global variables
+
 func main() {
 	//config log
 	ulog.Config(ulog.LOG_LEVEL_INFO, "./log.log", false)
+
 	// //service initialization
-	// //start servers
-	// agvSrv := srv.CreateTcpServer(cfg.port, cfg.addr)
-	// wsnSrv := srv.CreateTcpServer(cfg.port, cfg.addr)
-	// nvsSrv := srv.CreateTcpServer(cfg.port, cfg.addr)
 
 	// //membuff
 	// memBuff := membuff.CreateMemBuff(cfg.memBuffSize)
@@ -40,42 +39,62 @@ func main() {
 	//service discovery
 	//start go-zero services
 
-	//wait for close signal
-	// sig := make(chan os.Signal, 1)
-	// signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	// global context
+	// ctxGlobal := context.Background()
 
-	rx := make(chan int, 10)
+	// start conn servers
+	// srvMach := spec.NewMachServer(cfg.mach.port)
+	// dataCh := srvMach.Expose()
+	// go _task_mach_data_process(dataCh)
+	// srvMach.Start()
+	// srvIot := spec.NewIotServer(cfg.mqtt)
+	// srvIot.Start()
+	// srvStream := spec.NewNsServer(cfg.port)
+	// srvStream.Start()
 
-	wg.Add(1)
-	go _task_consume(rx)
-	wg.Add(1)
-	go _task_feed(rx)
-
-	wg.Wait()
-
+	// //start cloud-edge sync service
+	// serviceCesync := spec.NewCesyncService(cfg.host, cfg.host_ports)
 }
 
-func _task_consume(rx chan int) {
-	defer wg.Done()
+func _task_mach_data_process(ctx context.Context, ch chan MachData) {
 	for {
-		b := <-rx
-		// print(b)
-		output := struct {
-			Value int
-		}{
-			Value: b,
+		select {
+		case <-ch:
+			go func() {
+				// serviceMachDataProcess.
+				// 	Filter(data).
+				// 	Then().
+				// 	Align().
+				// 	Then().
+				// 	Publish()
+			}()
+		case <-ctx.Done():
+			break
 		}
-
-		ulog.Log().W("main", output)
 	}
 }
-func _task_feed(rx chan int) {
-	defer wg.Done()
 
-	cnt := 0
-	tic := time.NewTicker(time.Millisecond * 10)
-	for range tic.C {
-		rx <- cnt
-		cnt++
-	}
-}
+// func _task_consume(rx chan int) {
+// 	defer wg.Done()
+// 	for {
+// 		b := <-rx
+// 		// print(b)
+// 		output := struct {
+// 			Value int
+// 		}{
+// 			Value: b,
+// 		}
+
+// 		ulog.Log().W("main", output)
+// 	}
+// }
+// func _task_feed(rx chan int) {
+// 	defer wg.Done()
+
+// 	cnt := 0
+// 	tic := time.NewTicker(time.Millisecond * 10)
+// 	for range tic.C {
+// 		rx <- cnt
+// 		cnt++
+// 	}
+// }

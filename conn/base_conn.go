@@ -45,14 +45,18 @@ type BaseConn struct {
 }
 
 type Conn interface {
-	Connect()
-	Disconnect()
+	Connect() int
+	Disconnect() int
 
 	ScheduleWrite([]byte)
-	InstantWrite([]byte)
+	InstantWrite([]byte) int
 
-	Listen()
+	Listen(ch chan Conn)
 	Close()
+
+	//Ops
+	GetRxBuff() *utils.ByteRingBuffer
+	StartRecv()
 }
 
 type ConnCfg struct {

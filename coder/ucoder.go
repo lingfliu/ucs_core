@@ -2,6 +2,7 @@ package coder
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/lingfliu/ucs_core/utils"
 )
@@ -10,7 +11,9 @@ type UCoder struct {
 	buff     *utils.ByteRingBuffer
 	Codebook *Codebook
 
-	_buff []byte
+	_buff   []byte
+	ctx     context.Context
+	rxMsgCh chan *UMsg
 
 	//local variables
 	metaLen       int
@@ -20,8 +23,60 @@ type UCoder struct {
 	meta_tmp      []byte
 }
 
+func NewUCoderFromCodebook(codebook *Codebook) *UCoder {
+	coder := &UCoder{
+		buff:     utils.NewByteRingBuffer(1024),
+		Codebook: codebook,
+		_buff:    make([]byte, 1024),
+		ctx:      context.Background(),
+	}
+	return coder
+}
+
 func (coder *UCoder) Reset() {
 	coder.buff.Flush()
+}
+
+func (coder *UCoder) StartDecode(byteBuff *utils.ByteRingBuffer) chan *UMsg {
+	go coder._task_decode(coder.ctx, byteBuff)
+	return coder.rxMsgCh
+}
+
+func (coder *UCoder) StopDecode() {
+	coder.ctx.Done()
+}
+
+func (coder *UCoder) _task_decode(ctx context.Context, byteBuff *utils.ByteRingBuffer) {
+	for {
+		select {
+		case <-ctx.Done():
+			break
+		default:
+			//TODO: decode msg
+			foundHeader := false
+			for coder.buff.Capacity > len(coder.Codebook.Header) {
+				//wait for header triggered
+				coder.buff.Peek(coder._buff, len(coder.Codebook.Header))
+				if bytes.Equal(coder._buff, coder.Codebook.Header) {
+					foundHeader = true
+				} else {
+					coder.buff.Drop(1)
+				}
+			}
+			if !foundHeader {
+				//no header found, skip
+			} else {
+				//header found, decode msg
+				//1. decode meta
+				//2. decode payload
+				//3. crc check if needed
+				//4. push to rxMsgCh
+			}
+			msg := &UMsg{}
+			coder.rxMsgCh <- msg
+		}
+
+	}
 }
 
 func (coder *UCoder) PushDecode(bs []byte, n int) *UMsg {

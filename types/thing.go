@@ -1,6 +1,6 @@
 package types
 
-import "github.com/lingfliu/ucs_core/conn/conn"
+import "github.com/lingfliu/ucs_core/conn"
 
 /**
  * 物模型

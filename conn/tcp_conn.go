@@ -14,15 +14,17 @@ type TcpConn struct {
 	c *net.TCPConn
 }
 
-func NewTcpConn(remoteAddr string, port int) *TcpConn {
+func NewTcpConn(cfg *ConnCfg) *TcpConn {
 	c := &TcpConn{
 		BaseConn: BaseConn{
-			State:      CONN_STATE_DISCONNECTED,
-			RemoteAddr: remoteAddr,
-			Port:       port,
-			Class:      CONN_CLASS_TCP,
-			RxBuff:     utils.NewByteRingBuffer(1024),
-			TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
+			State:          CONN_STATE_DISCONNECTED,
+			RemoteAddr:     cfg.RemoteAddr,
+			Port:           cfg.Port,
+			Class:          CONN_CLASS_TCP,
+			KeepAlive:      cfg.KeepAlive,
+			ReconnectAfter: cfg.ReconnectAfter,
+			RxBuff:         utils.NewByteRingBuffer(1024),
+			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
 		},
 	}
 	return c
@@ -44,6 +46,7 @@ func (c *TcpConn) Connect() int {
 
 	go c._task_recv()
 	go c._task_send()
+
 	return 0
 }
 
@@ -52,12 +55,12 @@ func (c *TcpConn) Disconnect() int {
 	c.State = CONN_STATE_DISCONNECTED
 	if c.c != nil {
 		c.c.Close()
-		//TODO: finish rx & tx
+		return 0
 	}
-	return 0
+	return -1
 }
 
-func (c *TcpConn) Listen(ch chan *TcpConn) {
+func (c *TcpConn) Listen(ch chan Conn) {
 	addr := net.TCPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
@@ -109,8 +112,24 @@ func (c *TcpConn) _task_recv() {
 	}
 }
 
+func (c *TcpConn) StartRecv() {
+	go c._task_recv()
+}
+
+func (c *TcpConn) GetRxBuff() *utils.ByteRingBuffer {
+	return c.RxBuff
+}
+
 func (c *TcpConn) Read(buff []byte) int {
-	return 0
+	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Read(buff)
+	if err != nil {
+		//read error, break the connection
+		c.Disconnect()
+		return -1
+	} else {
+		return n
+	}
 }
 
 func (c *TcpConn) InstantWrite(buff []byte) int {

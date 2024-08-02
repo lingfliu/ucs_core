@@ -14,15 +14,19 @@ type UdpConn struct {
 	c *net.UDPConn
 }
 
-func NewUdpConn(remoteAddr string, port int) *TcpConn {
-	c := &TcpConn{
+func NewUdpConn(cfg *ConnCfg) *UdpConn {
+	c := &UdpConn{
 		BaseConn: BaseConn{
-			State:      CONN_STATE_DISCONNECTED,
-			RemoteAddr: remoteAddr,
-			Port:       port,
-			Class:      CONN_CLASS_UDP,
-			RxBuff:     utils.NewByteRingBuffer(1024),
-			TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
+			State:          CONN_STATE_DISCONNECTED,
+			RemoteAddr:     cfg.RemoteAddr,
+			Port:           cfg.Port,
+			Class:          CONN_CLASS_UDP,
+			KeepAlive:      cfg.KeepAlive,
+			ReconnectAfter: cfg.ReconnectAfter,
+			Timeout:        cfg.Timeout,
+			TimeoutRw:      cfg.TimeoutRw,
+			RxBuff:         utils.NewByteRingBuffer(1024),
+			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
 		},
 	}
 	return c
@@ -44,6 +48,7 @@ func (c *UdpConn) Connect() int {
 
 	go c._task_recv()
 	go c._task_send()
+
 	return 0
 }
 
@@ -53,11 +58,13 @@ func (c *UdpConn) Disconnect() int {
 	if c.c != nil {
 		c.c.Close()
 		//TODO: finish rx & tx
+		return 0
+	} else {
+		return -1
 	}
-	return 0
 }
 
-func (c *UdpConn) Listen(ch chan *UdpConn) {
+func (c *UdpConn) Listen(ch chan Conn) {
 	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
@@ -88,14 +95,21 @@ func (c *UdpConn) Listen(ch chan *UdpConn) {
 	}
 }
 
+func (c *UdpConn) GetRxBuff() *utils.ByteRingBuffer {
+	return c.RxBuff
+}
+
+func (c *UdpConn) StartRecv() {
+	go c._task_recv()
+}
+
 func (c *UdpConn) _task_recv() {
 	buff := make([]byte, 1024)
-	for {
+	for c.State == CONN_STATE_CONNECTED {
 		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
 		n, err := c.c.Read(buff)
 
 		if err != nil {
-			//TODO: handling disconnect
 			c.Disconnect()
 		}
 		if n > 0 {
@@ -105,7 +119,15 @@ func (c *UdpConn) _task_recv() {
 }
 
 func (c *UdpConn) Read(buff []byte) int {
-	return 0
+	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Read(buff)
+	if err != nil {
+		//read error, break the connection
+		c.Disconnect()
+		return -1
+	} else {
+		return n
+	}
 }
 
 func (c *UdpConn) InstantWrite(buff []byte) int {

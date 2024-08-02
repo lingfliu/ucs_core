@@ -14,18 +14,23 @@ import (
 
 type QuicConn struct {
 	BaseConn
-	c quic.Connection
+	c      quic.Connection
+	stream quic.Stream
 }
 
-func NewQuicConn(remoteAddr string, port int) *QuicConn {
+func NewQuicConn(cfg *ConnCfg) *QuicConn {
 	c := &QuicConn{
 		BaseConn: BaseConn{
-			State:      CONN_STATE_DISCONNECTED,
-			RemoteAddr: remoteAddr,
-			Port:       port,
-			Class:      CONN_CLASS_UDP,
-			RxBuff:     utils.NewByteRingBuffer(1024),
-			TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
+			State:          CONN_STATE_DISCONNECTED,
+			RemoteAddr:     cfg.RemoteAddr,
+			Port:           cfg.Port,
+			Class:          CONN_CLASS_UDP,
+			KeepAlive:      cfg.KeepAlive,
+			ReconnectAfter: cfg.ReconnectAfter,
+			Timeout:        cfg.Timeout,
+			TimeoutRw:      cfg.TimeoutRw,
+			RxBuff:         utils.NewByteRingBuffer(1024),
+			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
 		},
 	}
 	return c
@@ -41,56 +46,74 @@ func (c *QuicConn) Connect() int {
 		NextProtos:         []string{"ucs-quic"},
 	}
 
-	c, err = quic.DialAddr(context.Background(), conn.RemoteAddr, tlsCfg, nil)
-	if err != nil {
-		return -1
-	}
-
-	stream, err = c.OpenStreamSync(context.Background())
-	if err != nil {
-		return -1
-	}
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	udp, err := net.DialTimeout("udp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
+	qc, err = quic.DialAddr(context.Background(), c.RemoteAddr, tlsCfg, nil)
 	if err != nil {
-		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
+		ulog.Log().I("quicconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
 	}
 
+	stream, err = qc.OpenStreamSync(context.Background())
+	if err != nil {
+		ulog.Log().I("quicconn", "stream opening failed")
+		c.State = CONN_STATE_DISCONNECTED
+		return -1
+	}
+	c.c = qc
+	c.stream = stream
 	c.State = CONN_STATE_CONNECTED
-	c.c = udp.(*net.UDPConn)
 
 	go c._task_recv()
 	go c._task_send()
+
 	return 0
 }
 
-func (c *UdpConn) Disconnect() int {
+func (c *QuicConn) Disconnect() int {
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
 	if c.c != nil {
-		c.c.Close()
-		//TODO: finish rx & tx
+		err := c.c.CloseWithError(0, "")
+		if err != nil {
+			ulog.Log().I("quicconn", "conn close error")
+			return -1
+		}
+		err = c.stream.Close()
+		if err != nil {
+			ulog.Log().I("quicconn", "stream close error")
+			return -1
+		}
+		return 0
+	} else {
+		return -1
 	}
-	return 0
 }
 
-func (c *UdpConn) Listen(ch chan *UdpConn) {
+func (c *QuicConn) Listen(ch chan Conn) {
 	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
 	}
+	udpconn, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		ulog.Log().E("quic", "listen failed, check port")
+		c.Close()
+		return
+	}
+	tr := &quic.Transport{Conn: udpconn}
+	ln, err := tr.Listen(&tls.Config{InsecureSkipVerify: true}, &quic.Config{})
+
 	for {
-		cc, err := net.ListenUDP("udp", &addr)
+		cc, err := ln.Accept(context.Background())
 		if err != nil {
 			ulog.Log().E("tcpconn", "listen failed, check port")
 			c.Close()
 			break
 		}
-		udp := &UdpConn{
+		qc := &QuicConn{
 			BaseConn: BaseConn{
 				State:      CONN_STATE_CONNECTED,
 				Class:      CONN_CLASS_TCP,
@@ -105,15 +128,23 @@ func (c *UdpConn) Listen(ch chan *UdpConn) {
 			},
 			c: cc,
 		}
-		ch <- udp //TODO: test the channel for new conn handling
+		ch <- qc //TODO: test the channel for new conn handling
 	}
 }
 
-func (c *UdpConn) _task_recv() {
+func (c *QuicConn) GetRxBuff() *utils.ByteRingBuffer {
+	return c.RxBuff
+}
+
+func (c *QuicConn) StartRecv() {
+	go c._task_recv()
+}
+
+func (c *QuicConn) _task_recv() {
 	buff := make([]byte, 1024)
 	for {
-		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		n, err := c.c.Read(buff)
+		c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		n, err := c.stream.Read(buff)
 
 		if err != nil {
 			//TODO: handling disconnect
@@ -125,30 +156,36 @@ func (c *UdpConn) _task_recv() {
 	}
 }
 
-func (c *UdpConn) Read(buff []byte) int {
-	return 0
+func (c *QuicConn) Read(bs []byte) int {
+	c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.stream.Read(bs)
+	if err != nil {
+		return 0
+	} else {
+		return n
+	}
 }
 
-func (c *UdpConn) InstantWrite(buff []byte) int {
-	err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+func (c *QuicConn) InstantWrite(bs []byte) int {
+	err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
 	if err != nil {
-		c.Disconnect()
-	}
-
-	n, err := c.c.Write(buff)
-	if err != nil {
-		//write error, break the connection
-		c.Disconnect()
 		return -1
 	}
-	return n
+
+	n, err := c.stream.Write(bs)
+	if err != nil {
+		c.Disconnect()
+		return -1
+	} else {
+		return n
+	}
 }
 
-func (c *UdpConn) ScheduleWrite(buff []byte) {
-	c.TxBuff.Push(buff)
+func (c *QuicConn) ScheduleWrite(bs []byte) {
+	c.TxBuff.Push(bs)
 }
 
-func (c *UdpConn) _task_send() {
+func (c *QuicConn) _task_send() {
 	for c.State == CONN_STATE_CONNECTED {
 		buff := c.TxBuff.Pop()
 		if buff == nil {
@@ -156,19 +193,19 @@ func (c *UdpConn) _task_send() {
 			continue
 		}
 
-		err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
 		if err != nil {
 			c.Disconnect()
 		}
 
-		_, err = c.c.Write(buff)
+		_, err = c.stream.Write(buff)
 		if err != nil {
 			c.Disconnect()
 		}
 	}
 }
 
-func (c *UdpConn) _task_connect() {
+func (c *QuicConn) _task_connect() {
 	tic := time.NewTicker(time.Second * 1)
 	for c.State != CONN_STATE_CLOSE {
 		select {
@@ -180,9 +217,10 @@ func (c *UdpConn) _task_connect() {
 	}
 }
 
-func (c *UdpConn) Close() {
+func (c *QuicConn) Close() {
 	c.State = CONN_STATE_CLOSE
 	if c.c != nil {
-		c.c.Close()
+		c.c.CloseWithError(0, "")
+		c.stream.Close()
 	}
 }
