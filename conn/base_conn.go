@@ -14,12 +14,11 @@ const (
 	CONN_CLASS_HTTP string = "http"
 	CONN_CLASS_MQTT string = "mqtt"
 	CONN_CLASS_RTSP string = "rtsp"
+	// CONN_CLASS_kcp string = "kcp" //TODO: implement kcp
 )
 
-// const CONN_CLASS_kcp string = "kcp" //TODO: implement kcp
-
 // ********************************************************
-// conn bases
+// common attrs for conn
 // ********************************************************
 type BaseConn struct {
 	State      int
@@ -29,34 +28,41 @@ type BaseConn struct {
 	LocalAddr  string
 	RemoteAddr string
 	Port       int
-	Class      string //tcp, quic, http, mqtt, rtsp
+	Class      string //tcp, quic, http, mqtt
 
 	ReconnectAfter   int64
 	lastRecvAt       int64
 	lastConnectAt    int64
 	lastDisconnectAt int64
 
-	RxBuff *utils.ByteRingBuffer
+	// RxBuff *utils.ByteRingBuffer
 	TxBuff *utils.ByteArrayRingBuffer
 
 	//event
+	OnClose        func()
 	OnConnected    func()
 	OnDisconnected func()
+
+	//Signals
+	SigCtl chan any
 }
 
 type Conn interface {
-	Connect() int
-	Disconnect() int
-
-	ScheduleWrite([]byte)
-	InstantWrite([]byte) int
-
-	Listen(ch chan Conn)
+	Connect()
+	Disconnect()
 	Close()
 
-	//Ops
-	GetRxBuff() *utils.ByteRingBuffer
-	StartRecv()
+	// RW
+	ScheduleWrite([]byte)
+	InstantWrite([]byte) int
+	StartRecv() chan []byte
+
+	//Srv
+	Listen(ch chan Conn)
+	//Establish()
+
+	//Attr fetch
+	GetRemoteAddr() string
 }
 
 type ConnCfg struct {

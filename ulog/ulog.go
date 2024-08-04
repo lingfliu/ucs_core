@@ -21,15 +21,11 @@ type ULogger struct {
 
 var _ulogger *ULogger = nil
 
-func GetULogger() *ULogger {
+func Log() *ULogger {
 	if _ulogger == nil {
 		_ulogger = &ULogger{}
 	}
 	return _ulogger
-}
-
-func Log() *ULogger {
-	return GetULogger()
 }
 func (l *ULogger) Tag(tag string) *ULogger {
 	l._tag = tag
@@ -37,7 +33,7 @@ func (l *ULogger) Tag(tag string) *ULogger {
 }
 
 func Config(level int, exportPath string, trace bool) {
-	logger := GetULogger()
+	logger := Log()
 	logger.Level = level
 
 	var writer io.Writer

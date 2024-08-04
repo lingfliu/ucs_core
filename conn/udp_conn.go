@@ -187,3 +187,7 @@ func (c *UdpConn) Close() {
 		c.c.Close()
 	}
 }
+
+func (c *UdpConn) GetRemoteAddr() string {
+	return c.RemoteAddr
+}

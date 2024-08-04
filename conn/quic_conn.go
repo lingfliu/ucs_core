@@ -224,3 +224,7 @@ func (c *QuicConn) Close() {
 		c.stream.Close()
 	}
 }
+
+func (c *QuicConn) GetRemoteAddr() string {
+	return c.RemoteAddr
+}

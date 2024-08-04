@@ -23,14 +23,19 @@ func NewTcpConn(cfg *ConnCfg) *TcpConn {
 			Class:          CONN_CLASS_TCP,
 			KeepAlive:      cfg.KeepAlive,
 			ReconnectAfter: cfg.ReconnectAfter,
-			RxBuff:         utils.NewByteRingBuffer(1024),
+			Timeout:        cfg.Timeout,
+			TimeoutRw:      cfg.TimeoutRw,
 			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
 		},
 	}
 	return c
 }
 
-func (c *TcpConn) Connect() int {
+func (c *TcpConn) Connect() {
+	if c.State == CONN_STATE_CONNECTED || c.State == CONN_STATE_CONNECTING {
+		return
+	}
+
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
@@ -38,26 +43,25 @@ func (c *TcpConn) Connect() int {
 	if err != nil {
 		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
-		return -1
+	} else {
+		c.State = CONN_STATE_CONNECTED
+		c.c = tcp.(*net.TCPConn)
+
+		go c._task_recv()
+		go c._task_send()
 	}
-
-	c.State = CONN_STATE_CONNECTED
-	c.c = tcp.(*net.TCPConn)
-
-	go c._task_recv()
-	go c._task_send()
-
-	return 0
 }
 
-func (c *TcpConn) Disconnect() int {
+func (c *TcpConn) Disconnect() {
+	if c.State == CONN_STATE_DISCONNECTED {
+		return
+	}
+
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
 	if c.c != nil {
 		c.c.Close()
-		return 0
 	}
-	return -1
 }
 
 func (c *TcpConn) Listen(ch chan Conn) {
@@ -71,7 +75,7 @@ func (c *TcpConn) Listen(ch chan Conn) {
 		c.Close()
 	}
 
-	for {
+	for c.State != CONN_STATE_CLOSE {
 		cc, err := l.Accept()
 		if err != nil {
 			ulog.Log().E("tcpconn", "accept failed, shutdown")
@@ -87,7 +91,6 @@ func (c *TcpConn) Listen(ch chan Conn) {
 				LocalAddr:  c.LocalAddr,
 				RemoteAddr: cc.RemoteAddr().String(),
 				Port:       c.Port,
-				RxBuff:     utils.NewByteRingBuffer(1024),
 				TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
 			},
 			c: cc.(*net.TCPConn),
@@ -114,10 +117,6 @@ func (c *TcpConn) _task_recv() {
 
 func (c *TcpConn) StartRecv() {
 	go c._task_recv()
-}
-
-func (c *TcpConn) GetRxBuff() *utils.ByteRingBuffer {
-	return c.RxBuff
 }
 
 func (c *TcpConn) Read(buff []byte) int {
@@ -188,4 +187,8 @@ func (c *TcpConn) Close() {
 	if c.c != nil {
 		c.c.Close()
 	}
+}
+
+func (c *TcpConn) GetRemoteAddr() string {
+	return c.RemoteAddr
 }

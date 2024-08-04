@@ -22,11 +22,11 @@ func NewCodebookFromJson(jsonStr string) *Codebook {
 	var codebook *Codebook
 	json.Unmarshal([]byte(jsonStr), &codebook)
 	if codebook == nil {
-		ulog.GetULogger().I("codebook", "json unmarshal failed")
+		ulog.Log().I("codebook", "json unmarshal failed")
 		return nil
 	}
 	if codebook.Validate() != "passed" {
-		ulog.GetULogger().I("codebook", "validation failed")
+		ulog.Log().I("codebook", "validation failed")
 		return nil
 	} else {
 		return codebook
@@ -43,8 +43,11 @@ func (cb *Codebook) GetMetaSpec(name string) *CodeAttrSpec {
 }
 
 func (cb *Codebook) GetMsgSpec(class int) *CodeMsgSpec {
-	spec, ok := cb.MsgSet[class]
-	return spec
+	if spec, ok := cb.MsgSet[class]; ok {
+		return spec
+	} else {
+		return nil
+	}
 }
 
 /**

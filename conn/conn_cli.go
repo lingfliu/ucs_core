@@ -5,16 +5,12 @@ import (
 )
 
 const (
-	CLI_STATE_DISCONNECTED = 0
-	CLI_STATE_CONNECTING   = 1
-	CLI_STATE_CONNECTED    = 2
-	CLI_STATE_AUTH         = 3
+	CLI_STATE_CLOSE        = 0
+	CLI_STATE_DISCONNECTED = 1
+	CLI_STATE_CONNECTING   = 2
+	CLI_STATE_CONNECTED    = 3
+	CLI_STATE_AUTH         = 4
 )
-
-type CliAttr struct {
-	name  string
-	value any
-}
 
 type Cli struct {
 	Conn     Conn
@@ -22,12 +18,12 @@ type Cli struct {
 	Coder    *coder.UCoder
 	State    int
 
-	ReqSet  map[string]coder.Msg // a req msg set that requiring response
-	Auth    string
-	AttrSet map[string]CliAttr
+	ReqSet map[string]coder.Msg // a req msg set that requiring response
+	Token  string               //ascii string token
 
 	//event
-	OnReq func(coder.Msg)
+	OnReq       func(coder.Msg)
+	OnRecvBytes func([]byte)
 }
 
 func NewCli(connCfg *ConnCfg, codebookJson string) *Cli {
@@ -60,10 +56,10 @@ func (cli *Cli) Connect() {
 		cli.State = CLI_STATE_CONNECTED
 	}
 
-	// ctx, cancel := context.WithCancel(context.Background())
+	// ctx := context.WithValue(context.Background(), "flag_running", true)
 
-	// bsCh := make(chan []byte)
-	// go cli.Conn.StartRecv(bsCh)
+	bsCh := make(chan []byte)
+	go cli.Conn.StartRecv(bsCh)
 	// rxMsgChan := cli.Coder.StartDecode(bsCh)
 	// go cli.HandleMsg(rxMsgChan)
 }
@@ -113,4 +109,9 @@ func (cli *Cli) Query(msg coder.Msg) *coder.UMsg {
 	// }
 
 	return ackMsg
+}
+
+func (cli *Cli) Close() {
+	cli.Conn.Close()
+	cli.State = CLI_STATE_CLOSE
 }
