@@ -27,11 +27,11 @@ func main() {
 	cb := coder.NewCodebookFromJson("")
 	srv := conn.NewConnSrv(cfg, cb)
 
-	srv.Start()
 	srv.MsgHandler = func(cc *conn.ConnCli, msg *coder.ZeroMsg) {
 		ulog.Log().I("main", "msg from cli: "+cc.Conn.GetRemoteAddr()+" msg class: "+strconv.Itoa(msg.Class))
 	}
 
+	go srv.Start()
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
 
