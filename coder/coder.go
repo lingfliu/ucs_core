@@ -36,7 +36,10 @@ type CodeMsgSpec struct {
 
 type Coder interface {
 	Reset()
-	Encode(msg *UMsg, bs []byte) int   //encode msg to byte, return length of the msg
-	PushDecode(bs []byte, n int) *UMsg //push bs into the coder and try to decode from the ringbuffer return nil if decaode fails
-	FastDecode(bs []byte) *UMsg        //fast decode without passing through ring buffer
+	Push()
+	Encode(msg *UMsg, bs []byte) int //encode msg to byte, return length of the msg
+
+	//PushDecode(bs []byte, n int) *UMsg //push bs into the coder and try to decode from the ringbuffer return nil if decaode fails
+
+	FastDecode(bs []byte) *UMsg //fast decode without passing through ring buffer
 }
