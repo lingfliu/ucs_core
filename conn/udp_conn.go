@@ -1,6 +1,7 @@
 package conn
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -15,6 +16,8 @@ type UdpConn struct {
 }
 
 func NewUdpConn(cfg *ConnCfg) *UdpConn {
+	sigRun, cancelRun := context.WithCancel(context.Background())
+	sigRw, cancelRw := context.WithCancel(context.Background())
 	c := &UdpConn{
 		BaseConn: BaseConn{
 			State:          CONN_STATE_DISCONNECTED,
@@ -25,169 +28,160 @@ func NewUdpConn(cfg *ConnCfg) *UdpConn {
 			ReconnectAfter: cfg.ReconnectAfter,
 			Timeout:        cfg.Timeout,
 			TimeoutRw:      cfg.TimeoutRw,
-			RxBuff:         utils.NewByteRingBuffer(1024),
-			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
+			Rx:             nil,
+			Tx:             nil,
+			Io:             make(chan []chan []byte),
+
+			sigRun:    sigRun,
+			cancelRun: cancelRun,
+			sigRw:     sigRw,
+			cancelRw:  cancelRw,
 		},
+		c: nil,
 	}
 	return c
 }
 
 func (c *UdpConn) Connect() int {
+	if c.State == CONN_STATE_CONNECTED || c.State == CONN_STATE_CONNECTING {
+		return -2
+	}
+
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
 	udp, err := net.DialTimeout("udp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
 	if err != nil {
-		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
+		ulog.Log().I("udpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
+	} else {
+
+		c.c = udp.(*net.UDPConn)
+		c.Rx = make(chan []byte, 32)
+		c.Tx = make(chan []byte, 32)
+
+		c.Io <- []chan []byte{c.Rx, c.Tx}
+		c.State = CONN_STATE_CONNECTED
+		c.c = udp.(*net.UDPConn)
+
+		go c._task_recv(c.sigRun)
+		go c._task_send(c.sigRun)
+		return 0
 	}
-
-	c.State = CONN_STATE_CONNECTED
-	c.c = udp.(*net.UDPConn)
-
-	go c._task_recv()
-	go c._task_send()
-
-	return 0
 }
 
 func (c *UdpConn) Disconnect() int {
+	if c.State == CONN_STATE_DISCONNECTED || c.State == CONN_STATE_CLOSED {
+		return -2
+	}
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
+
+	close(c.Rx)
+	c.Io <- make([]chan []byte, 0)
+
 	if c.c != nil {
 		c.c.Close()
-		//TODO: finish rx & tx
-		return 0
-	} else {
-		return -1
 	}
+	return 0
 }
 
-func (c *UdpConn) Listen(ch chan Conn) {
+func (c *UdpConn) Listen(ctx context.Context, ch chan Conn) {
 	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
 	}
-	for {
-		cc, err := net.ListenUDP("udp", &addr)
-		if err != nil {
-			ulog.Log().E("tcpconn", "listen failed, check port")
-			c.Close()
-			break
-		}
-		udp := &UdpConn{
-			BaseConn: BaseConn{
-				State:      CONN_STATE_CONNECTED,
-				Class:      CONN_CLASS_TCP,
-				KeepAlive:  c.KeepAlive,
-				Timeout:    c.Timeout,
-				TimeoutRw:  c.TimeoutRw,
-				LocalAddr:  c.LocalAddr,
-				RemoteAddr: cc.RemoteAddr().String(),
-				Port:       c.Port,
-				RxBuff:     utils.NewByteRingBuffer(1024),
-				TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
-			},
-			c: cc,
-		}
-		ch <- udp //TODO: test the channel for new conn handling
-	}
-}
 
-func (c *UdpConn) GetRxBuff() *utils.ByteRingBuffer {
-	return c.RxBuff
-}
-
-func (c *UdpConn) StartRecv() {
-	go c._task_recv()
-}
-
-func (c *UdpConn) _task_recv() {
-	buff := make([]byte, 1024)
-	for c.State == CONN_STATE_CONNECTED {
-		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		n, err := c.c.Read(buff)
-
-		if err != nil {
-			c.Disconnect()
-		}
-		if n > 0 {
-			c.RxBuff.Push(buff, n)
+	for c.State != CONN_STATE_CLOSED {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			cc, err := net.ListenUDP("udp", &addr)
+			if err != nil {
+				ulog.Log().E("tcpconn", "listen failed, check port")
+				c.Close()
+				break
+			}
+			udp := &UdpConn{
+				BaseConn: BaseConn{
+					State:      CONN_STATE_CONNECTED,
+					Class:      CONN_CLASS_TCP,
+					KeepAlive:  c.KeepAlive,
+					Timeout:    c.Timeout,
+					TimeoutRw:  c.TimeoutRw,
+					LocalAddr:  c.LocalAddr,
+					RemoteAddr: cc.RemoteAddr().String(),
+					Port:       c.Port,
+				},
+				c: cc,
+			}
+			ch <- udp //TODO: test the channel for new conn handling
 		}
 	}
 }
 
-func (c *UdpConn) Read(buff []byte) int {
+func (c *UdpConn) GetRx() chan []byte {
+	return c.Rx
+}
+
+func (c *UdpConn) GetTx() chan []byte {
+	return c.Tx
+}
+
+func (c *UdpConn) GetIo() chan []chan []byte {
+	return c.Io
+}
+
+func (c *UdpConn) Read(bs []byte) (n int) {
+	if c.State != CONN_STATE_CONNECTED {
+		return -1
+	}
+
 	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	n, err := c.c.Read(buff)
+
+	n, err := c.c.Read(bs)
 	if err != nil {
-		//read error, break the connection
+		ulog.Log().E("udpconn", "read failed")
 		c.Disconnect()
 		return -1
-	} else {
-		return n
 	}
+	return
 }
 
-func (c *UdpConn) InstantWrite(buff []byte) int {
-	err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	if err != nil {
-		c.Disconnect()
+func (c *UdpConn) Write(bs []byte) int {
+	if c.State != CONN_STATE_CONNECTED {
+		return -1
 	}
 
-	n, err := c.c.Write(buff)
+	c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Write(bs)
 	if err != nil {
-		//write error, break the connection
+		ulog.Log().E("udpconn", "write failed")
 		c.Disconnect()
 		return -1
 	}
 	return n
 }
 
-func (c *UdpConn) ScheduleWrite(buff []byte) {
-	c.TxBuff.Push(buff)
-}
-
-func (c *UdpConn) _task_send() {
-	for c.State == CONN_STATE_CONNECTED {
-		buff := c.TxBuff.Pop()
-		if buff == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		if err != nil {
-			c.Disconnect()
-		}
-
-		_, err = c.c.Write(buff)
-		if err != nil {
-			c.Disconnect()
-		}
+func (c *UdpConn) Close() int {
+	if c.State == CONN_STATE_CLOSED {
+		return -2
 	}
-}
 
-func (c *UdpConn) _task_connect() {
-	tic := time.NewTicker(time.Second * 1)
-	for c.State != CONN_STATE_CLOSE {
-		select {
-		case <-tic.C:
-			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
-				c.Connect()
-			}
-		}
-	}
-}
-
-func (c *UdpConn) Close() {
-	c.State = CONN_STATE_CLOSE
+	c.State = CONN_STATE_CLOSED
 	if c.c != nil {
 		c.c.Close()
 	}
+	c.Io <- make([]chan []byte, 0)
+	return 0
 }
 
 func (c *UdpConn) GetRemoteAddr() string {
 	return c.RemoteAddr
+}
+
+func (c *UdpConn) GetState() int {
+	return c.State
 }

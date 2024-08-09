@@ -1,19 +1,27 @@
 package conn
 
-import "github.com/lingfliu/ucs_core/utils"
+import (
+	"context"
+	"time"
+
+	"github.com/lingfliu/ucs_core/ulog"
+	"github.com/lingfliu/ucs_core/utils"
+)
 
 const (
 	CONN_STATE_DISCONNECTED = 0
 	CONN_STATE_CONNECTING   = 1
 	CONN_STATE_CONNECTED    = 2
-	CONN_STATE_CLOSE        = 3
+	CONN_STATE_CLOSED       = 3
+	CONN_STATE_LISTENING    = 4
 
-	CONN_CLASS_TCP  string = "tcp"
-	CONN_CLASS_UDP  string = "udp"
-	CONN_CLASS_QUIC string = "quic"
-	CONN_CLASS_HTTP string = "http"
-	CONN_CLASS_MQTT string = "mqtt"
-	CONN_CLASS_RTSP string = "rtsp"
+	CONN_CLASS_TCP    string = "tcp"
+	CONN_CLASS_UDP    string = "udp"
+	CONN_CLASS_QUIC   string = "quic"
+	CONN_CLASS_MQTT   string = "mqtt"
+	CONN_CLASS_MODBUS string = "modbus"
+	CONN_CLASS_HTTP   string = "http"
+	CONN_CLASS_RTSP   string = "rtsp"
 	// CONN_CLASS_kcp string = "kcp" //TODO: implement kcp
 )
 
@@ -35,34 +43,145 @@ type BaseConn struct {
 	lastConnectAt    int64
 	lastDisconnectAt int64
 
-	// RxBuff *utils.ByteRingBuffer
-	TxBuff *utils.ByteArrayRingBuffer
+	Rx chan []byte
+	Tx chan []byte
 
-	//event
-	OnClose        func()
-	OnConnected    func()
-	OnDisconnected func()
+	Io chan [](chan []byte)
 
-	//Signals
-	SigCtl chan any
+	//contexts
+	sigRun    context.Context
+	cancelRun context.CancelFunc
+	sigRw     context.Context
+	cancelRw  context.CancelFunc
+}
+
+/**********************tasks**************************/
+func (c *BaseConn) _task_connect(ctx context.Context) {
+	tic := time.NewTicker(time.Duration(1) * time.Second)
+
+	for c.State != CONN_STATE_CLOSED {
+		select {
+		case <-tic.C:
+			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
+				c.Connect()
+			}
+			break
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (c *BaseConn) _task_recv(ctx context.Context) {
+
+	for c.State == CONN_STATE_CONNECTED {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			bs := make([]byte, 1024)
+			c.Read(bs)
+			c.Tx <- bs
+		}
+	}
+}
+
+func (c *BaseConn) _task_send(ctx context.Context) {
+	for c.State == CONN_STATE_CONNECTED {
+		select {
+		case buff := <-c.Tx:
+			if buff == nil || len(buff) == 0 {
+				continue
+			} else {
+				c.Write(buff)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+/**********************Conn interface implement**************************/
+func (c *BaseConn) GetRx() chan []byte {
+	return c.Rx
+}
+
+func (c *BaseConn) GetTx() chan []byte {
+	return c.Tx
+}
+
+func (c *BaseConn) GetIo() chan []chan []byte {
+	return c.Io
+}
+
+func (c *BaseConn) GetRemoteAddr() string {
+	return c.RemoteAddr
+}
+
+func (c *BaseConn) GetState() int {
+	return c.State
+}
+
+func (c *BaseConn) Read(buff []byte) int {
+	ulog.Log().E("BaseConn", "Read() not implemented")
+	return 0
+}
+
+func (c *BaseConn) Write(buff []byte) int {
+	ulog.Log().E("BaseConn", "Write() not implemented")
+	return 0
+}
+
+func (c *BaseConn) Start() chan [](chan []byte) {
+	go c.Connect()
+	go c._task_connect(context.Background())
+	return c.Io
+}
+
+func (c *BaseConn) Connect() int {
+	ulog.Log().E("BaseConn", "Connect() not implemented")
+	return 0
+}
+
+func (c *BaseConn) Disconnect() int {
+	ulog.Log().E("BaseConn", "Disconnect() not implemented")
+	return 0
+}
+
+func (c *BaseConn) Listen(ctx context.Context, ch chan Conn) {
+	ulog.Log().E("BaseConn", "Listen() not implemented")
+}
+
+func (c *BaseConn) Close() int {
+	if c.State == CONN_STATE_CLOSED {
+		return -2
+	}
+
+	c.cancelRw()  //stop rw
+	c.cancelRun() //stop connect
+	c.State = CONN_STATE_CLOSED
+	c.Disconnect()
+	close(c.Rx)
+	return 0
 }
 
 type Conn interface {
-	Connect()
-	Disconnect()
-	Close()
+	Connect() int
+	Disconnect() int
+	Close() int
 
-	// RW
-	ScheduleWrite([]byte)
-	InstantWrite([]byte) int
-	StartRecv() chan []byte
+	Read(bs []byte) int
+	Write(bs []byte) int
 
 	//Srv
-	Listen(ch chan Conn)
-	//Establish()
+	Listen(ctx context.Context, ch chan Conn)
 
 	//Attr fetch
 	GetRemoteAddr() string
+	GetState() int
+	GetRx() chan []byte
+	GetTx() chan []byte
+	GetIo() chan []chan []byte
 }
 
 type ConnCfg struct {

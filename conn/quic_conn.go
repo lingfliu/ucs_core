@@ -16,6 +16,7 @@ type QuicConn struct {
 	BaseConn
 	c      quic.Connection
 	stream quic.Stream
+	ctx    context.Context
 }
 
 func NewQuicConn(cfg *ConnCfg) *QuicConn {
@@ -29,14 +30,20 @@ func NewQuicConn(cfg *ConnCfg) *QuicConn {
 			ReconnectAfter: cfg.ReconnectAfter,
 			Timeout:        cfg.Timeout,
 			TimeoutRw:      cfg.TimeoutRw,
-			RxBuff:         utils.NewByteRingBuffer(1024),
-			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
+			Rx:             make(chan []byte, 32),
+			Tx:             make(chan []byte, 32),
 		},
+		c:   nil,
+		ctx: context.WithValue(context.Background(), "conn_ctrl", make(chan bool)),
 	}
 	return c
 }
 
 func (c *QuicConn) Connect() int {
+	if c.State != CONN_STATE_DISCONNECTED {
+		return -2
+	}
+
 	var err error
 	var stream quic.Stream
 	var qc quic.Connection
@@ -64,150 +71,142 @@ func (c *QuicConn) Connect() int {
 	}
 	c.c = qc
 	c.stream = stream
-	c.State = CONN_STATE_CONNECTED
 
-	go c._task_recv()
-	go c._task_send()
+	c.State = CONN_STATE_CONNECTED
+	c.Rx = make(chan []byte, 32)
+	c.Tx = make(chan []byte, 32)
+	c.Io <- []chan []byte{c.Rx, c.Tx}
+
+	go c._task_recv(c.sigRun)
+	go c._task_send(c.sigRun)
 
 	return 0
 }
 
 func (c *QuicConn) Disconnect() int {
+	if c.State == CONN_STATE_CLOSED || c.State == CONN_STATE_DISCONNECTED {
+		return -2
+	}
+
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
-	if c.c != nil {
-		err := c.c.CloseWithError(0, "")
-		if err != nil {
-			ulog.Log().I("quicconn", "conn close error")
-			return -1
-		}
-		err = c.stream.Close()
-		if err != nil {
-			ulog.Log().I("quicconn", "stream close error")
-			return -1
-		}
-		return 0
-	} else {
-		return -1
+
+	close(c.Rx)
+	c.Io <- make([]chan []byte, 0)
+
+	err := c.c.CloseWithError(0, "")
+	if err != nil {
+		ulog.Log().I("quicconn", "conn close error")
 	}
+	err = c.stream.Close()
+	if err != nil {
+		ulog.Log().I("quicconn", "stream close error")
+	}
+	return 0
 }
 
-func (c *QuicConn) Listen(ch chan Conn) {
+func (c *QuicConn) Listen(ctx context.Context, ch chan Conn) {
 	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
 	}
 	udpconn, err := net.ListenUDP("udp", &addr)
 	if err != nil {
-		ulog.Log().E("quic", "listen failed, check port")
+		ulog.Log().E("quicconn", "listen failed, check port")
 		c.Close()
 		return
 	}
 	tr := &quic.Transport{Conn: udpconn}
 	ln, err := tr.Listen(&tls.Config{InsecureSkipVerify: true}, &quic.Config{})
+	if err != nil {
+		ulog.Log().E("quicconn", "listen failed, check config")
+	}
 
-	for {
-		cc, err := ln.Accept(context.Background())
-		if err != nil {
-			ulog.Log().E("tcpconn", "listen failed, check port")
-			c.Close()
-			break
+	for c.State != CONN_STATE_CLOSED {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			cc, err := ln.Accept(context.Background())
+			if err != nil {
+				ulog.Log().E("tcpconn", "listen failed, check port")
+				c.Close()
+				break
+			}
+			qc := &QuicConn{
+				BaseConn: BaseConn{
+					State:      CONN_STATE_CONNECTED,
+					Class:      CONN_CLASS_TCP,
+					KeepAlive:  c.KeepAlive,
+					Timeout:    c.Timeout,
+					TimeoutRw:  c.TimeoutRw,
+					LocalAddr:  c.LocalAddr,
+					RemoteAddr: cc.RemoteAddr().String(),
+					Port:       c.Port,
+					Rx:         make(chan []byte, 32),
+					Tx:         make(chan []byte, 32),
+				},
+				c: cc,
+			}
+			ch <- qc //TODO: test the channel for new conn handling
 		}
-		qc := &QuicConn{
-			BaseConn: BaseConn{
-				State:      CONN_STATE_CONNECTED,
-				Class:      CONN_CLASS_TCP,
-				KeepAlive:  c.KeepAlive,
-				Timeout:    c.Timeout,
-				TimeoutRw:  c.TimeoutRw,
-				LocalAddr:  c.LocalAddr,
-				RemoteAddr: cc.RemoteAddr().String(),
-				Port:       c.Port,
-				RxBuff:     utils.NewByteRingBuffer(1024),
-				TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
-			},
-			c: cc,
-		}
-		ch <- qc //TODO: test the channel for new conn handling
 	}
 }
 
-func (c *QuicConn) GetRxBuff() *utils.ByteRingBuffer {
-	return c.RxBuff
-}
-
-func (c *QuicConn) StartRecv() {
-	go c._task_recv()
-}
-
-func (c *QuicConn) _task_recv() {
+func (c *QuicConn) _task_recv(ctx context.Context) {
 	buff := make([]byte, 1024)
-	for {
-		c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		n, err := c.stream.Read(buff)
-
-		if err != nil {
-			//TODO: handling disconnect
-			c.Disconnect()
-		}
-		if n > 0 {
-			c.RxBuff.Push(buff, n)
-		}
-	}
-}
-
-func (c *QuicConn) Read(bs []byte) int {
-	c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	n, err := c.stream.Read(bs)
-	if err != nil {
-		return 0
-	} else {
-		return n
-	}
-}
-
-func (c *QuicConn) InstantWrite(bs []byte) int {
-	err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	if err != nil {
-		return -1
-	}
-
-	n, err := c.stream.Write(bs)
-	if err != nil {
-		c.Disconnect()
-		return -1
-	} else {
-		return n
-	}
-}
-
-func (c *QuicConn) ScheduleWrite(bs []byte) {
-	c.TxBuff.Push(bs)
-}
-
-func (c *QuicConn) _task_send() {
 	for c.State == CONN_STATE_CONNECTED {
-		buff := c.TxBuff.Pop()
-		if buff == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
+		select {
+		case run := <-ctx.Value("conn_trl").(chan bool):
+			if !run {
+				return
+			}
+		default:
+			c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+			n, err := c.stream.Read(buff)
 
-		err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		if err != nil {
-			c.Disconnect()
+			if err != nil {
+				//TODO: handling disconnect
+				c.Disconnect()
+				break
+			}
+			if n > 0 {
+				c.Rx <- buff[:n]
+			}
 		}
+	}
+}
 
-		_, err = c.stream.Write(buff)
-		if err != nil {
-			c.Disconnect()
+func (c *QuicConn) _task_send(ctx context.Context) {
+	for c.State == CONN_STATE_CONNECTED {
+		select {
+		case buff := <-c.Tx:
+			if buff == nil || len(buff) == 0 {
+				// time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+			if err != nil {
+				c.Disconnect()
+				return
+			}
+			_, err = c.stream.Write(buff)
+			if err != nil {
+				c.Disconnect()
+				return
+			}
+			break
+		case run := <-ctx.Value("conn_ctrl").(chan bool):
+			if !run {
+				return
+			}
 		}
 	}
 }
 
 func (c *QuicConn) _task_connect() {
 	tic := time.NewTicker(time.Second * 1)
-	for c.State != CONN_STATE_CLOSE {
+	for c.State != CONN_STATE_CLOSED {
 		select {
 		case <-tic.C:
 			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
@@ -217,12 +216,17 @@ func (c *QuicConn) _task_connect() {
 	}
 }
 
-func (c *QuicConn) Close() {
-	c.State = CONN_STATE_CLOSE
+func (c *QuicConn) Close() int {
+	if c.State == CONN_STATE_CLOSED {
+		return -2
+	}
+	c.State = CONN_STATE_CLOSED
 	if c.c != nil {
 		c.c.CloseWithError(0, "")
 		c.stream.Close()
 	}
+	c.Io <- make([]chan []byte, 0)
+	return 0
 }
 
 func (c *QuicConn) GetRemoteAddr() string {

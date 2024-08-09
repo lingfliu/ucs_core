@@ -1,8 +1,10 @@
 package conn
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
@@ -11,10 +13,13 @@ import (
 
 type TcpConn struct {
 	BaseConn
-	c *net.TCPConn
+	c         *net.TCPConn
+	stateLock *sync.RWMutex
 }
 
 func NewTcpConn(cfg *ConnCfg) *TcpConn {
+	sigRun, cancelRun := context.WithCancel(context.Background())
+	sigRw, cancelRw := context.WithCancel(context.Background())
 	c := &TcpConn{
 		BaseConn: BaseConn{
 			State:          CONN_STATE_DISCONNECTED,
@@ -25,15 +30,30 @@ func NewTcpConn(cfg *ConnCfg) *TcpConn {
 			ReconnectAfter: cfg.ReconnectAfter,
 			Timeout:        cfg.Timeout,
 			TimeoutRw:      cfg.TimeoutRw,
-			TxBuff:         utils.NewByteArrayRingBuffer(32, 1024),
+			Rx:             nil,
+			Tx:             nil,
+			Io:             make(chan []chan []byte),
+
+			sigRun:    sigRun,
+			cancelRun: cancelRun,
+			sigRw:     sigRw,
+			cancelRw:  cancelRw,
 		},
+		c:         nil,
+		stateLock: &sync.RWMutex{},
 	}
 	return c
 }
 
-func (c *TcpConn) Connect() {
-	if c.State == CONN_STATE_CONNECTED || c.State == CONN_STATE_CONNECTING {
-		return
+/*
+ * Connect to remote addr
+ * @return 0 if connected, -1 if failed, -2 if already connected
+ */
+func (c *TcpConn) Connect() int {
+
+	state := c.State
+	if state == CONN_STATE_CONNECTED || state == CONN_STATE_CONNECTING {
+		return -2
 	}
 
 	c.State = CONN_STATE_CONNECTING
@@ -43,28 +63,47 @@ func (c *TcpConn) Connect() {
 	if err != nil {
 		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
-	} else {
-		c.State = CONN_STATE_CONNECTED
-		c.c = tcp.(*net.TCPConn)
 
-		go c._task_recv()
-		go c._task_send()
+		return -1
+	} else {
+		c.c = tcp.(*net.TCPConn)
+		c.Rx = make(chan []byte, 32)
+		c.Tx = make(chan []byte, 32)
+
+		c.Io <- []chan []byte{c.Rx, c.Tx}
+
+		go c._task_recv(c.sigRun)
+		go c._task_send(c.sigRun)
+		return 0
 	}
 }
 
-func (c *TcpConn) Disconnect() {
+/*
+ * Disconnect from remote addr
+ * return 0 anyway
+ */
+func (c *TcpConn) Disconnect() int {
 	if c.State == CONN_STATE_DISCONNECTED {
-		return
+		return 0
 	}
-
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
+
+	close(c.Rx)
+	c.Io <- []chan []byte{c.Rx, c.Tx}
+
 	if c.c != nil {
 		c.c.Close()
 	}
+	return 0
 }
 
-func (c *TcpConn) Listen(ch chan Conn) {
+/*
+ * Listen on port
+ * @param ch channel to send new conn
+ * @return 0 if success, -1 if failed
+ */
+func (c *TcpConn) Listen(ctx context.Context, ch chan Conn) {
 	addr := net.TCPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
@@ -72,123 +111,88 @@ func (c *TcpConn) Listen(ch chan Conn) {
 	l, err := net.ListenTCP("tcp", &addr)
 	if err != nil {
 		ulog.Log().E("tcpconn", "listen failed, check port")
+		c.State = CONN_STATE_CLOSED
 		c.Close()
+		return
 	}
 
-	for c.State != CONN_STATE_CLOSE {
-		cc, err := l.Accept()
-		if err != nil {
-			ulog.Log().E("tcpconn", "accept failed, shutdown")
-			break
-		}
-		tcp := &TcpConn{
-			BaseConn: BaseConn{
-				State:      CONN_STATE_CONNECTED,
-				Class:      CONN_CLASS_TCP,
-				KeepAlive:  c.KeepAlive,
-				Timeout:    c.Timeout,
-				TimeoutRw:  c.TimeoutRw,
-				LocalAddr:  c.LocalAddr,
-				RemoteAddr: cc.RemoteAddr().String(),
-				Port:       c.Port,
-				TxBuff:     utils.NewByteArrayRingBuffer(32, 1024),
-			},
-			c: cc.(*net.TCPConn),
-		}
-		ch <- tcp //TODO: test the channel for new conn handling
-	}
-}
-
-func (c *TcpConn) _task_recv() {
-	buff := make([]byte, 1024)
-	for {
-		c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		n, err := c.c.Read(buff)
-
-		if err != nil {
-			//TODO: handling disconnect
-			c.Disconnect()
-		}
-		if n > 0 {
-			c.RxBuff.Push(buff, n)
+	c.State = CONN_STATE_LISTENING
+	for c.State != CONN_STATE_CLOSED {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			cc, err := l.Accept()
+			if err != nil {
+				ulog.Log().E("tcpconn", "accept failed, skip")
+				continue
+			}
+			// create tcpconn using default conn cfg
+			cfg := ctx.Value("conn_cfg").(*ConnCfg)
+			tcp := NewTcpConn(cfg)
+			tcp.c = cc.(*net.TCPConn)
+			tcp.Tx = make(chan []byte, 32)
+			tcp.Rx = make(chan []byte, 32)
+			ch <- tcp //TODO: test the channel for new conn handling
 		}
 	}
 }
 
-func (c *TcpConn) StartRecv() {
-	go c._task_recv()
+func (c *TcpConn) Close() int {
+	if c.State == CONN_STATE_CLOSED {
+		return -2
+	}
+
+	c.State = CONN_STATE_CLOSED
+	if c.c != nil {
+		c.c.Close()
+	}
+	c.Io <- make([]chan []byte, 0)
+	return 0
 }
 
-func (c *TcpConn) Read(buff []byte) int {
-	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	n, err := c.c.Read(buff)
-	if err != nil {
-		//read error, break the connection
-		c.Disconnect()
+func (c *TcpConn) Read(bs []byte) int {
+	if c.State != CONN_STATE_CONNECTED {
 		return -1
-	} else {
-		return n
-	}
-}
-
-func (c *TcpConn) InstantWrite(buff []byte) int {
-	err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	if err != nil {
-		c.Disconnect()
 	}
 
-	n, err := c.c.Write(buff)
+	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Read(bs)
 	if err != nil {
-		//write error, break the connection
+		ulog.Log().E("tcpconn", "read failed")
 		c.Disconnect()
 		return -1
 	}
 	return n
 }
 
-func (c *TcpConn) ScheduleWrite(buff []byte) {
-	c.TxBuff.Push(buff)
-}
-
-func (c *TcpConn) _task_send() {
-	for c.State == CONN_STATE_CONNECTED {
-		buff := c.TxBuff.Pop()
-		if buff == nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
-		}
-
-		err := c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-		if err != nil {
-			c.Disconnect()
-		}
-
-		_, err = c.c.Write(buff)
-		if err != nil {
-			c.Disconnect()
-		}
+func (c *TcpConn) Write(bs []byte) int {
+	if c.State != CONN_STATE_CONNECTED {
+		return -1
 	}
-}
 
-func (c *TcpConn) _task_connect() {
-	tic := time.NewTicker(time.Second * 1)
-	for c.State != CONN_STATE_CLOSE {
-		select {
-		case <-tic.C:
-			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
-				c.Connect()
-			}
-		}
+	c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Write(bs)
+	if err != nil {
+		ulog.Log().E("tcpconn", "write failed")
+		c.Disconnect()
+		return -1
 	}
-}
-
-func (c *TcpConn) Close() {
-	c.State = CONN_STATE_CLOSE
-	if c.c != nil {
-		c.c.Close()
-	}
+	return n
 }
 
 func (c *TcpConn) GetRemoteAddr() string {
 	return c.RemoteAddr
+}
+
+func (c *TcpConn) GetState() int {
+	return c.State
+}
+
+func (c *TcpConn) GetRx() chan []byte {
+	return c.Rx
+}
+
+func (c *TcpConn) GetTx() chan []byte {
+	return c.Tx
 }
