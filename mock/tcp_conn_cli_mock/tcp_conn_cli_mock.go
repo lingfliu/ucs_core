@@ -25,7 +25,7 @@ func main() {
 		ReconnectAfter: 1000,
 	}
 
-	cb := coder.NewCodebookFromJson("")
+	cb := coder.NewCodebookFromJson("{}")
 	// create a tcp client
 	cli := conn.NewConnCli(cfg, cb)
 

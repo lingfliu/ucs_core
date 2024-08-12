@@ -53,7 +53,6 @@ func (srv *ConnSrv) Start() {
 	switch srv.ConnCfg.Class {
 	case CONN_CLASS_TCP:
 		srv.Conn = NewTcpConn(srv.ConnCfg)
-		break
 	case CONN_CLASS_UDP:
 		// srv.Conn = NewUdpConn(srv.ConnCfg)
 	default:
@@ -129,7 +128,9 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 				}
 			}
 			srv.PrepareConn(cli)
-			cli.Start()
+			cli.StartRw()
+		case <-srv.sigRun.Done():
+			return
 		}
 	}
 }
@@ -150,6 +151,8 @@ func (srv *ConnSrv) _task_cleanup() {
 					delete(srv.CliSet, k)
 				}
 			}
+		case <-srv.sigRun.Done():
+			return
 		}
 	}
 }

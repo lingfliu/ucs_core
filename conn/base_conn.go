@@ -65,7 +65,6 @@ func (c *BaseConn) _task_connect(ctx context.Context) {
 			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
 				c.Connect()
 			}
-			break
 		case <-ctx.Done():
 			return
 		}
@@ -90,7 +89,7 @@ func (c *BaseConn) _task_send(ctx context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:
-			if buff == nil || len(buff) == 0 {
+			if len(buff) == 0 {
 				continue
 			} else {
 				c.Write(buff)
@@ -132,9 +131,9 @@ func (c *BaseConn) Write(buff []byte) int {
 	return 0
 }
 
-func (c *BaseConn) Start() chan [](chan []byte) {
-	go c.Connect()
-	go c._task_connect(context.Background())
+func (c *BaseConn) Start(sigRun context.Context) chan [](chan []byte) {
+	// go c.Connect()
+	go c._task_connect(sigRun)
 	return c.Io
 }
 
@@ -166,6 +165,7 @@ func (c *BaseConn) Close() int {
 }
 
 type Conn interface {
+	Start(ctx context.Context) chan [](chan []byte)
 	Connect() int
 	Disconnect() int
 	Close() int

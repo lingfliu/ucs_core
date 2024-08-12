@@ -161,14 +161,7 @@ func (cli *ConnCli) Connect() {
 		ulog.Log().E("ConnCli", "Connect failed")
 	} else {
 		cli.State = CLI_STATE_CONNECTED
-
-		rx := cli.Conn.GetRx()
-		tx := cli.Conn.GetTx()
-		io := cli.Conn.GetIo()
-
-		go cli._task_decode(rx)
-		go cli._task_encode(tx)
-		go cli._task_handle_connect(io)
+		cli.StartRw()
 	}
 }
 
@@ -176,8 +169,12 @@ func (cli *ConnCli) Connect() {
  * effective under spawn mode
  **/
 func (cli *ConnCli) Start() {
-	go cli.Connect()
+	sigRun := cli.sigRun
+	io := cli.Conn.Start(sigRun)
+	go cli._task_handle_connect(io)
+}
 
+func (cli *ConnCli) StartRw() {
 	rx := cli.Conn.GetRx()
 	tx := cli.Conn.GetTx()
 	io := cli.Conn.GetIo()
@@ -185,6 +182,7 @@ func (cli *ConnCli) Start() {
 	go cli._task_decode(rx)
 	go cli._task_encode(tx)
 	go cli._task_handle_connect(io)
+	go cli._task_handle_msg()
 }
 
 func (cli *ConnCli) Disconnect() {

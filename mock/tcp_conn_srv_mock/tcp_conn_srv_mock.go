@@ -24,7 +24,7 @@ func main() {
 		ReconnectAfter: 1000,
 	}
 
-	cb := coder.NewCodebookFromJson("")
+	cb := coder.NewCodebookFromJson("{}")
 	srv := conn.NewConnSrv(cfg, cb)
 
 	srv.MsgHandler = func(cc *conn.ConnCli, msg *coder.ZeroMsg) {

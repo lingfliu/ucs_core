@@ -30,8 +30,8 @@ func NewTcpConn(cfg *ConnCfg) *TcpConn {
 			ReconnectAfter: cfg.ReconnectAfter,
 			Timeout:        cfg.Timeout,
 			TimeoutRw:      cfg.TimeoutRw,
-			Rx:             nil,
-			Tx:             nil,
+			Rx:             make(chan []byte, 32),
+			Tx:             make(chan []byte, 32),
 			Io:             make(chan []chan []byte),
 
 			sigRun:    sigRun,
@@ -59,7 +59,7 @@ func (c *TcpConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	tcp, err := net.DialTimeout("tcp", c.RemoteAddr, time.Duration(c.Timeout)*time.Millisecond)
+	tcp, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", c.RemoteAddr, c.Port), time.Duration(c.Timeout)*time.Millisecond)
 	if err != nil {
 		ulog.Log().I("tcpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
@@ -67,10 +67,10 @@ func (c *TcpConn) Connect() int {
 		return -1
 	} else {
 		c.c = tcp.(*net.TCPConn)
-		c.Rx = make(chan []byte, 32)
-		c.Tx = make(chan []byte, 32)
+		// c.Rx = make(chan []byte, 32)
+		// c.Tx = make(chan []byte, 32)
 
-		c.Io <- []chan []byte{c.Rx, c.Tx}
+		// c.Io <- []chan []byte{c.Rx, c.Tx}
 
 		go c._task_recv(c.sigRun)
 		go c._task_send(c.sigRun)
@@ -168,7 +168,7 @@ func (c *TcpConn) Read(bs []byte) int {
 
 func (c *TcpConn) Write(bs []byte) int {
 	if c.State != CONN_STATE_CONNECTED {
-		return -1
+		return -2
 	}
 
 	c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
@@ -195,4 +195,63 @@ func (c *TcpConn) GetRx() chan []byte {
 
 func (c *TcpConn) GetTx() chan []byte {
 	return c.Tx
+}
+
+func (c *TcpConn) Start(sigRun context.Context) chan []chan []byte {
+	go c._task_connect(sigRun)
+	return c.Io
+}
+
+//tasks
+
+func (c *TcpConn) _task_recv(ctx context.Context) {
+	for c.State == CONN_STATE_CONNECTED {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			bs := make([]byte, 1024)
+			c.Read(bs)
+			c.Rx <- bs
+		}
+	}
+}
+
+func (c *TcpConn) _task_send(ctx context.Context) {
+	for c.State == CONN_STATE_CONNECTED {
+		select {
+		case buff := <-c.Tx:
+			if len(buff) == 0 {
+				continue
+			} else {
+				n := c.Write(buff)
+				if n == -1 {
+					ulog.Log().E("tcpconn", "write failed, disconnect")
+					c.Disconnect()
+					return
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (c *TcpConn) _task_connect(ctx context.Context) {
+	if !c.KeepAlive {
+		return
+	}
+
+	tic := time.NewTicker(time.Duration(1) * time.Second)
+
+	for c.State != CONN_STATE_CLOSED {
+		select {
+		case <-tic.C:
+			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
+				c.Connect()
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
