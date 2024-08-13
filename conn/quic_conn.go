@@ -20,6 +20,7 @@ type QuicConn struct {
 }
 
 func NewQuicConn(cfg *ConnCfg) *QuicConn {
+	sigRun, cancelRun := context.WithCancel(context.Background())
 	c := &QuicConn{
 		BaseConn: BaseConn{
 			State:          CONN_STATE_DISCONNECTED,
@@ -32,9 +33,11 @@ func NewQuicConn(cfg *ConnCfg) *QuicConn {
 			TimeoutRw:      cfg.TimeoutRw,
 			Rx:             make(chan []byte, 32),
 			Tx:             make(chan []byte, 32),
+			Io:             make(chan int),
+			sigRun:         sigRun,
+			cancelRun:      cancelRun,
 		},
-		c:   nil,
-		ctx: context.WithValue(context.Background(), "conn_ctrl", make(chan bool)),
+		c: nil,
 	}
 	return c
 }
@@ -56,7 +59,7 @@ func (c *QuicConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	qc, err = quic.DialAddr(context.Background(), c.RemoteAddr, tlsCfg, nil)
+	qc, err = quic.DialAddr(context.Background(), utils.IpPortJoin(c.RemoteAddr, c.Port), tlsCfg, nil)
 	if err != nil {
 		ulog.Log().I("quicconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
@@ -73,9 +76,7 @@ func (c *QuicConn) Connect() int {
 	c.stream = stream
 
 	c.State = CONN_STATE_CONNECTED
-	c.Rx = make(chan []byte, 32)
-	c.Tx = make(chan []byte, 32)
-	c.Io <- []chan []byte{c.Rx, c.Tx}
+	c.Io <- CONN_STATE_CONNECTED
 
 	go c._task_recv(c.sigRun)
 	go c._task_send(c.sigRun)
@@ -92,7 +93,7 @@ func (c *QuicConn) Disconnect() int {
 	c.State = CONN_STATE_DISCONNECTED
 
 	close(c.Rx)
-	c.Io <- make([]chan []byte, 0)
+	c.Io <- CONN_STATE_DISCONNECTED
 
 	err := c.c.CloseWithError(0, "")
 	if err != nil {
@@ -105,7 +106,7 @@ func (c *QuicConn) Disconnect() int {
 	return 0
 }
 
-func (c *QuicConn) Listen(ctx context.Context, ch chan Conn) {
+func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan Conn) {
 	addr := net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
 		Port: c.Port,
@@ -124,7 +125,7 @@ func (c *QuicConn) Listen(ctx context.Context, ch chan Conn) {
 
 	for c.State != CONN_STATE_CLOSED {
 		select {
-		case <-ctx.Done():
+		case <-sigRun.Done():
 			return
 		default:
 			cc, err := ln.Accept(context.Background())
@@ -145,9 +146,11 @@ func (c *QuicConn) Listen(ctx context.Context, ch chan Conn) {
 					Port:       c.Port,
 					Rx:         make(chan []byte, 32),
 					Tx:         make(chan []byte, 32),
+					Io:         make(chan int),
 				},
 				c: cc,
 			}
+
 			ch <- qc //TODO: test the channel for new conn handling
 		}
 	}
@@ -181,7 +184,7 @@ func (c *QuicConn) _task_send(ctx context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:
-			if buff == nil || len(buff) == 0 {
+			if len(buff) == 0 {
 				// time.Sleep(100 * time.Millisecond)
 				continue
 			}
@@ -195,7 +198,6 @@ func (c *QuicConn) _task_send(ctx context.Context) {
 				c.Disconnect()
 				return
 			}
-			break
 		case run := <-ctx.Value("conn_ctrl").(chan bool):
 			if !run {
 				return
@@ -225,7 +227,7 @@ func (c *QuicConn) Close() int {
 		c.c.CloseWithError(0, "")
 		c.stream.Close()
 	}
-	c.Io <- make([]chan []byte, 0)
+	c.Io <- CONN_STATE_CLOSED
 	return 0
 }
 

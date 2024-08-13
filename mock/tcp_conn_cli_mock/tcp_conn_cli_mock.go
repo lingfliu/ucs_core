@@ -19,10 +19,10 @@ func main() {
 		RemoteAddr:     "127.0.0.1",
 		Port:           12001,
 		Class:          conn.CONN_CLASS_TCP,
-		Timeout:        1000,
-		TimeoutRw:      1000,
+		Timeout:        1000 * 1000 * 1000,
+		TimeoutRw:      1000 * 1000 * 1000,
 		KeepAlive:      true,
-		ReconnectAfter: 1000,
+		ReconnectAfter: 1000 * 1000 * 1000,
 	}
 
 	cb := coder.NewCodebookFromJson("{}")

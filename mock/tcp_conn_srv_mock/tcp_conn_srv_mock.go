@@ -15,13 +15,14 @@ func main() {
 	ulog.Config(ulog.LOG_LEVEL_INFO, "", false)
 
 	cfg := &conn.ConnCfg{
-		RemoteAddr:     "127.0.0.1",
-		Port:           12001,
-		Class:          conn.CONN_CLASS_TCP,
-		Timeout:        1000,
-		TimeoutRw:      1000,
+		RemoteAddr: "127.0.0.1",
+		Port:       12001,
+		Class:      conn.CONN_CLASS_TCP,
+
+		Timeout:        1000 * 1000,
+		TimeoutRw:      1000 * 1000,
 		KeepAlive:      true,
-		ReconnectAfter: 1000,
+		ReconnectAfter: 1000 * 1000,
 	}
 
 	cb := coder.NewCodebookFromJson("{}")
@@ -41,7 +42,7 @@ func main() {
 			srv.Stop()
 			return
 		default:
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(1 * time.Second)
 		}
 	}
 }

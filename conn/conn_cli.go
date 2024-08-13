@@ -2,9 +2,9 @@ package conn
 
 import (
 	"context"
+	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
-	"github.com/lingfliu/ucs_core/ulog"
 )
 
 const (
@@ -14,8 +14,8 @@ const (
 	CLI_STATE_CONNECTED    = 3
 	CLI_STATE_AUTH         = 4
 
-	CLI_MODE_HOST  = 1 // cli at cli side
-	CLI_MODE_SPAWN = 2 // cli at server side
+	CLI_MODE_HOST  = 1 // cli side cli
+	CLI_MODE_SPAWN = 2 // server side cli
 )
 
 type ConnCli struct {
@@ -90,7 +90,6 @@ func (cli *ConnCli) _task_decode(rx chan []byte) {
 		select {
 		case bs := <-rx:
 			cli.Coder.FastDecode(bs)
-			break
 		case <-cli.sigCoding.Done():
 			return
 		}
@@ -104,8 +103,21 @@ func (cli *ConnCli) _task_handle_msg() {
 			if cli.HandleMsg != nil {
 				cli.HandleMsg(msg)
 			}
-			break
 		case <-cli.sigRun.Done():
+			return
+		}
+	}
+}
+
+func (cli *ConnCli) _task_pingpong() {
+	tic := time.NewTicker(time.Duration(1) * time.Second)
+	for cli.State == CLI_STATE_CONNECTED || cli.State == CLI_STATE_AUTH {
+		select {
+		case <-tic.C:
+			cli.txMsg <- &coder.ZeroMsg{
+				Class: 0,
+			}
+		case <-cli.sigCoding.Done():
 			return
 		}
 	}
@@ -124,16 +136,14 @@ func (cli *ConnCli) _task_encode(tx chan []byte) {
 	}
 }
 
-func (cli *ConnCli) _task_handle_connect(io chan []chan []byte) {
-	for cli.State == STATE_ON {
+func (cli *ConnCli) _task_handle_connect(io chan int) {
+	for cli.State != CLI_STATE_CLOSED {
 		select {
 		case cs := <-io:
-			if len(cs) == 0 {
+			if cs == CONN_STATE_CLOSED {
 				//conn closed
 				cli.cancelCoding()
 			} else {
-				rx := cs[0]
-				tx := cs[1]
 
 				//TODO: finish previous decode & encode routines
 				cli.cancelCoding()
@@ -143,25 +153,13 @@ func (cli *ConnCli) _task_handle_connect(io chan []chan []byte) {
 				cli.cancelCoding = cancel
 
 				//restart decode / encode routines
-				go cli._task_decode(rx)
-				go cli._task_encode(tx)
+				cli.State = CLI_STATE_CONNECTED
+				cli.StartRw()
 			}
 		case <-cli.sigRun.Done():
 			cli.cancelCoding()
 			return
 		}
-	}
-}
-
-func (cli *ConnCli) Connect() {
-	cli.State = CLI_STATE_CONNECTING
-	ret := cli.Conn.Connect()
-	if ret != 0 {
-		cli.State = CLI_STATE_DISCONNECTED
-		ulog.Log().E("ConnCli", "Connect failed")
-	} else {
-		cli.State = CLI_STATE_CONNECTED
-		cli.StartRw()
 	}
 }
 
@@ -183,6 +181,7 @@ func (cli *ConnCli) StartRw() {
 	go cli._task_encode(tx)
 	go cli._task_handle_connect(io)
 	go cli._task_handle_msg()
+	go cli._task_pingpong()
 }
 
 func (cli *ConnCli) Disconnect() {

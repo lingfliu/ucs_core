@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
-	"github.com/lingfliu/ucs_core/utils"
 )
 
 const (
@@ -46,7 +45,7 @@ type BaseConn struct {
 	Rx chan []byte
 	Tx chan []byte
 
-	Io chan [](chan []byte)
+	Io chan int
 
 	//contexts
 	sigRun    context.Context
@@ -57,14 +56,16 @@ type BaseConn struct {
 
 /**********************tasks**************************/
 func (c *BaseConn) _task_connect(ctx context.Context) {
+
 	tic := time.NewTicker(time.Duration(1) * time.Second)
 
 	for c.State != CONN_STATE_CLOSED {
 		select {
 		case <-tic.C:
-			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
-				c.Connect()
-			}
+			ulog.Log().E("baseconn", "task connect not implemented")
+		// 	if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
+		// 		c.Connect()
+		// 	}
 		case <-ctx.Done():
 			return
 		}
@@ -78,9 +79,10 @@ func (c *BaseConn) _task_recv(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			bs := make([]byte, 1024)
-			c.Read(bs)
-			c.Tx <- bs
+			ulog.Log().E("baseconn", "task recv not implemented")
+			// bs := make([]byte, 1024)
+			// c.Read(bs)
+			// c.Rx <- bs
 		}
 	}
 }
@@ -89,11 +91,13 @@ func (c *BaseConn) _task_send(ctx context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:
-			if len(buff) == 0 {
-				continue
-			} else {
-				c.Write(buff)
-			}
+			buff[0] = 0
+			ulog.Log().E("baseconn", "task send not implemented")
+			// if len(buff) == 0 {
+			// 	continue
+			// } else {
+			// 	c.Write(buff)
+			// }
 		case <-ctx.Done():
 			return
 		}
@@ -109,7 +113,7 @@ func (c *BaseConn) GetTx() chan []byte {
 	return c.Tx
 }
 
-func (c *BaseConn) GetIo() chan []chan []byte {
+func (c *BaseConn) GetIo() chan int {
 	return c.Io
 }
 
@@ -131,7 +135,7 @@ func (c *BaseConn) Write(buff []byte) int {
 	return 0
 }
 
-func (c *BaseConn) Start(sigRun context.Context) chan [](chan []byte) {
+func (c *BaseConn) Start(sigRun context.Context) chan int {
 	// go c.Connect()
 	go c._task_connect(sigRun)
 	return c.Io
@@ -147,7 +151,7 @@ func (c *BaseConn) Disconnect() int {
 	return 0
 }
 
-func (c *BaseConn) Listen(ctx context.Context, ch chan Conn) {
+func (c *BaseConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan Conn) {
 	ulog.Log().E("BaseConn", "Listen() not implemented")
 }
 
@@ -165,7 +169,7 @@ func (c *BaseConn) Close() int {
 }
 
 type Conn interface {
-	Start(ctx context.Context) chan [](chan []byte)
+	Start(ctx context.Context) chan int
 	Connect() int
 	Disconnect() int
 	Close() int
@@ -174,14 +178,14 @@ type Conn interface {
 	Write(bs []byte) int
 
 	//Srv
-	Listen(ctx context.Context, ch chan Conn)
+	Listen(sig context.Context, cfg context.Context, ch chan Conn)
 
 	//Attr fetch
 	GetRemoteAddr() string
 	GetState() int
 	GetRx() chan []byte
 	GetTx() chan []byte
-	GetIo() chan []chan []byte
+	GetIo() chan int
 }
 
 type ConnCfg struct {

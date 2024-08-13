@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
@@ -11,8 +10,8 @@ import (
 )
 
 const (
-	STATE_ON  = 0
-	STATE_OFF = 1
+	SRV_STATE_ON  = 0
+	SRV_STATE_OFF = 1
 )
 
 type ConnSrv struct {
@@ -29,27 +28,32 @@ type ConnSrv struct {
 	sigRun    context.Context
 	cancelRun context.CancelFunc
 
+	ctxCfg context.Context
+
 	//callbacks
 	MsgHandler func(*ConnCli, *coder.ZeroMsg)
 }
 
 func NewConnSrv(connCfg *ConnCfg, cb *coder.Codebook) *ConnSrv {
 	sigRun, cancelRun := context.WithCancel(context.Background())
+	cfg := context.WithValue(context.Background(), utils.CtxKeyCfg{}, connCfg)
 	srv := &ConnSrv{
 		ConnCfg:  connCfg,
 		Codebook: cb,
 		CliSet:   make(map[string]*ConnCli),
-		State:    STATE_OFF,
+		State:    SRV_STATE_OFF,
 		Conn:     nil,
 
 		sigRun:    sigRun,
 		cancelRun: cancelRun,
+
+		ctxCfg: cfg,
 	}
 	return srv
 }
 
 func (srv *ConnSrv) Start() {
-	srv.State = STATE_ON
+	srv.State = SRV_STATE_ON
 	switch srv.ConnCfg.Class {
 	case CONN_CLASS_TCP:
 		srv.Conn = NewTcpConn(srv.ConnCfg)
@@ -60,14 +64,14 @@ func (srv *ConnSrv) Start() {
 	}
 
 	connChn := make(chan Conn)
-	srv.Conn.Listen(srv.sigRun, connChn)
+	go srv.Conn.Listen(srv.sigRun, srv.ctxCfg, connChn)
 
 	go srv._task_spawn_cli(connChn)
 	go srv._task_cleanup()
 }
 
 func (srv *ConnSrv) Stop() {
-	srv.State = STATE_OFF
+	srv.State = SRV_STATE_OFF
 	srv.cancelRun()
 	for _, v := range srv.CliSet {
 		v.Close()
@@ -107,21 +111,22 @@ func (srv *ConnSrv) SpawnConnCli(c Conn) *ConnCli {
 }
 
 func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
-	for srv.State == STATE_ON {
+	for srv.State == SRV_STATE_ON {
 		select {
 		case c := <-connChn:
 			cli := srv.SpawnConnCli(c)
+			ulog.Log().I("conncli", "new cli spawned "+cli.Conn.GetRemoteAddr())
 			srv.CliSet[cli.Conn.GetRemoteAddr()] = cli
 
 			cli.HandleMsg = func(msg *coder.ZeroMsg) {
 
 				//TODO: demo code, remove on release
-				ulog.Log().I("conncli", "received msg")
-				jsonStr, err := json.Marshal(msg)
-				if err != nil {
-					ulog.Log().E("conncli", "msg decode error")
-				}
-				ulog.Log().I("conncli", "received msg: "+string(jsonStr))
+				// ulog.Log().I("conncli", "received msg")
+				// jsonStr, err := json.Marshal(msg)
+				// if err != nil {
+				// ulog.Log().E("conncli", "msg decode error")
+				// }
+				// ulog.Log().I("conncli", "received msg: "+string(jsonStr))
 
 				if srv.MsgHandler != nil {
 					srv.MsgHandler(cli, msg)
@@ -142,7 +147,7 @@ func (srv *ConnSrv) PrepareConn(cli *ConnCli) {
 
 func (srv *ConnSrv) _task_cleanup() {
 	tic := time.NewTicker(time.Second * 1)
-	for srv.State == STATE_ON {
+	for srv.State == SRV_STATE_ON {
 		select {
 		case <-tic.C:
 			for k, cli := range srv.CliSet {

@@ -40,10 +40,23 @@ func (coder *ZeroCoder) Encode(msg *ZeroMsg, bs []byte) int {
 
 func (coder *ZeroCoder) FastDecode(bs []byte) {
 	if bytes.Equal(bs[:4], coder.Header) {
-		payloadLen := utils.Byte2Int(bs, 8, 2, false, true)
-		msg := &ZeroMsg{
-			Class: utils.Byte2Int(bs, 6, 2, false, true),
-			Data:  bs[8 : 8+payloadLen],
+		class := utils.Byte2Int(bs, 4, 2, false, true)
+		var payloadLen int
+		var msg *ZeroMsg
+		if class == 0 {
+			//no payload
+			payloadLen = 0
+
+			msg = &ZeroMsg{
+				Class: utils.Byte2Int(bs, 6, 2, false, true),
+				Data:  nil,
+			}
+		} else {
+			payloadLen = utils.Byte2Int(bs, 6, 2, false, true)
+			msg = &ZeroMsg{
+				Class: class,
+				Data:  bs[8 : 8+payloadLen],
+			}
 		}
 		coder.RxMsg <- msg
 	}

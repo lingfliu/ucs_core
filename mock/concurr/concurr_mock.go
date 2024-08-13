@@ -13,12 +13,12 @@ func task_1(ctx context.Context) {
 	defer ulog.Log().I("task_1", "task_2 done")
 	for {
 		select {
-		// case <-ctx.Done():
-		// return
-		case stop := <-ctx.Value("sig_stop").(chan bool):
-			if stop {
-				return
-			}
+		case <-ctx.Done():
+			return
+		// case stop := <-ctx.Value("sig_stop").(chan bool):
+		// 	if stop {
+		// 		return
+		// 	}
 		default:
 			// do something
 			time.Sleep(1 * time.Second)
@@ -34,16 +34,37 @@ func task_2(ctx context.Context) {
 	defer ulog.Log().I("task_2", "task_2 done")
 	for {
 		select {
-		// case <-ctx.Done():
-		// return
-		case stop := <-ctx.Value("sig_stop").(chan bool):
-			if stop {
-				return
-			}
+		case <-ctx.Done():
+			return
+		// case stop := <-ctx.Value("sig_stop").(chan bool):
+		// 	if stop {
+		// 		return
+		// 	}
 		default:
 			// do something
 			time.Sleep(1 * time.Second)
 			ulog.Log().I("task_2", "doing something"+" "+strconv.Itoa(cnt))
+			cnt += 1
+		}
+	}
+
+}
+
+func task_3(ctx context.Context) {
+	cnt := 0
+	defer ulog.Log().I("task_3", "task_3 done")
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		// case stop := <-ctx.Value("sig_stop").(chan bool):
+		// 	if stop {
+		// 		return
+		// 	}
+		default:
+			// do something
+			time.Sleep(1 * time.Second)
+			ulog.Log().I("task_3", "doing something"+" "+strconv.Itoa(cnt))
 			cnt += 1
 		}
 	}
@@ -63,6 +84,20 @@ func main() {
 		// ctx.Value("sig_stop").(chan bool) <- true
 		cancel()
 		break
+	}
+
+	for i := 0; i < 5; i++ {
+		time.Sleep(1 * time.Second)
+	}
+
+	ulog.Log().I("main", "start another task")
+
+	go task_3(ctx)
+
+	tic = time.Tick(2 * time.Second)
+	select {
+	case <-tic:
+		cancel()
 	}
 
 	for {
