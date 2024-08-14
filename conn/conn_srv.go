@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
@@ -106,6 +107,8 @@ func (srv *ConnSrv) SpawnConnCli(c Conn) *ConnCli {
 
 		sigRun:    ctx2,
 		cancelRun: cancel2,
+
+		lastMsgAt: utils.CurrentTime(),
 	}
 	return cli
 }
@@ -119,15 +122,6 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 			srv.CliSet[cli.Conn.GetRemoteAddr()] = cli
 
 			cli.HandleMsg = func(msg *coder.ZeroMsg) {
-
-				//TODO: demo code, remove on release
-				// ulog.Log().I("conncli", "received msg")
-				// jsonStr, err := json.Marshal(msg)
-				// if err != nil {
-				// ulog.Log().E("conncli", "msg decode error")
-				// }
-				// ulog.Log().I("conncli", "received msg: "+string(jsonStr))
-
 				if srv.MsgHandler != nil {
 					srv.MsgHandler(cli, msg)
 				}
@@ -142,7 +136,7 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 
 func (srv *ConnSrv) PrepareConn(cli *ConnCli) {
 	//non-blocking msg sending
-	cli.PushTxMsg(cli.Coder.CreatePingpongMsg())
+	// cli.PushTxMsg(cli.Coder.CreatePingpongMsg())
 }
 
 func (srv *ConnSrv) _task_cleanup() {
@@ -150,9 +144,12 @@ func (srv *ConnSrv) _task_cleanup() {
 	for srv.State == SRV_STATE_ON {
 		select {
 		case <-tic.C:
+			ulog.Log().I("connsrv", "cleaning up inactive cli")
 			for k, cli := range srv.CliSet {
 				if utils.CurrentTime()-cli.lastMsgAt > srv.MsgTimeout {
 					//inactive cli, remove
+					ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
+					cli.Close()
 					delete(srv.CliSet, k)
 				}
 			}

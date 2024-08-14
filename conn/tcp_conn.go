@@ -71,6 +71,7 @@ func (c *TcpConn) Connect() int {
 		return -1
 	} else {
 		//renew conn and rw control
+		ulog.Log().I("tcpconn", fmt.Sprintf("connected to %s:%d", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_CONNECTED
 		c.Io <- CONN_STATE_CONNECTED
 		c.c = tcp.(*net.TCPConn)
@@ -214,7 +215,6 @@ func (c *TcpConn) _task_recv(sigRw context.Context) {
 }
 
 func (c *TcpConn) _task_send(sigRw context.Context) {
-	ulog.Log().I("tcpconn", "task send started")
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:

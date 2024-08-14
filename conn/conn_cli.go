@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
+	"github.com/lingfliu/ucs_core/utils"
 )
 
 const (
@@ -100,6 +101,7 @@ func (cli *ConnCli) _task_handle_msg() {
 	for cli.State == CLI_STATE_CONNECTED || cli.State == CLI_STATE_AUTH {
 		select {
 		case msg := <-cli.Coder.RxMsg:
+			cli.lastMsgAt = utils.CurrentTime()
 			if cli.HandleMsg != nil {
 				cli.HandleMsg(msg)
 			}
@@ -175,13 +177,14 @@ func (cli *ConnCli) Start() {
 func (cli *ConnCli) StartRw() {
 	rx := cli.Conn.GetRx()
 	tx := cli.Conn.GetTx()
-	io := cli.Conn.GetIo()
 
 	go cli._task_decode(rx)
 	go cli._task_encode(tx)
-	go cli._task_handle_connect(io)
 	go cli._task_handle_msg()
-	go cli._task_pingpong()
+
+	if cli.Mode == CLI_MODE_SPAWN {
+		go cli._task_pingpong()
+	}
 }
 
 func (cli *ConnCli) Disconnect() {
@@ -192,8 +195,6 @@ func (cli *ConnCli) Close() {
 	cli.State = CLI_STATE_CLOSED
 	cli.Conn.Close()
 	cli.cancelRun()
-
-	close(cli.Conn.GetTx())
 }
 
 func (cli *ConnCli) PushTxMsg(msg *coder.ZeroMsg) {
