@@ -94,7 +94,7 @@ func (c *TcpConn) Disconnect() int {
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
 
-	c.Io <- c.State
+	c.Io <- CONN_STATE_DISCONNECTED
 
 	c.cancelRw()
 	if c.c != nil {

@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
@@ -128,6 +127,16 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 			}
 			srv.PrepareConn(cli)
 			cli.StartRw()
+			// go func(cli *ConnCli) {
+			// 	select {
+			// 	case io := <-cli.Io:
+			// 		if io == CONN_STATE_DISCONNECTED {
+			// 			ulog.Log().I("conncli", "cli disconnected "+cli.Conn.GetRemoteAddr())
+			// 			cli.Close()
+			// 			delete(srv.CliSet, cli.Conn.GetRemoteAddr())
+			// 		}
+			// 	}
+			// }(cli)
 		case <-srv.sigRun.Done():
 			return
 		}
@@ -144,11 +153,11 @@ func (srv *ConnSrv) _task_cleanup() {
 	for srv.State == SRV_STATE_ON {
 		select {
 		case <-tic.C:
-			ulog.Log().I("connsrv", "cleaning up inactive cli")
+			// ulog.Log().I("connsrv", "cleaning up inactive cli")
 			for k, cli := range srv.CliSet {
 				if utils.CurrentTime()-cli.lastMsgAt > srv.MsgTimeout {
 					//inactive cli, remove
-					ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
+					// ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
 					cli.Close()
 					delete(srv.CliSet, k)
 				}

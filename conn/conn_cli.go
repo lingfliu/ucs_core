@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lingfliu/ucs_core/coder"
+	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
 )
 
@@ -142,20 +143,23 @@ func (cli *ConnCli) _task_handle_connect(io chan int) {
 	for cli.State != CLI_STATE_CLOSED {
 		select {
 		case cs := <-io:
-			if cs == CONN_STATE_CLOSED {
+			switch cs {
+			case CONN_STATE_CLOSED:
+				ulog.Log().I("conncli", "conn closed")
 				//conn closed
 				cli.cancelCoding()
-			} else {
-
-				//TODO: finish previous decode & encode routines
+			case CONN_STATE_DISCONNECTED:
+				cli.State = CLI_STATE_DISCONNECTED
+			case CONN_STATE_CONNECTING:
+				cli.State = CLI_STATE_CONNECTING
+			case CONN_STATE_CONNECTED:
+				cli.State = CLI_STATE_CONNECTED
 				cli.cancelCoding()
-
+				//TODO: finish previous decode & encode routines
 				ctx, cancel := context.WithCancel(context.Background())
 				cli.sigCoding = ctx
 				cli.cancelCoding = cancel
-
 				//restart decode / encode routines
-				cli.State = CLI_STATE_CONNECTED
 				cli.StartRw()
 			}
 		case <-cli.sigRun.Done():
@@ -181,10 +185,11 @@ func (cli *ConnCli) StartRw() {
 	go cli._task_decode(rx)
 	go cli._task_encode(tx)
 	go cli._task_handle_msg()
+	go cli._task_handle_connect(cli.Conn.GetIo())
 
-	if cli.Mode == CLI_MODE_SPAWN {
-		go cli._task_pingpong()
-	}
+	// if cli.Mode == CLI_MODE_SPAWN {
+	go cli._task_pingpong()
+	// }
 }
 
 func (cli *ConnCli) Disconnect() {
