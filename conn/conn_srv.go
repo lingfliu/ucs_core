@@ -64,10 +64,14 @@ func (srv *ConnSrv) Start() {
 	}
 
 	connChn := make(chan Conn)
+
+	//for keepalive conns
 	go srv.Conn.Listen(srv.sigRun, srv.ctxCfg, connChn)
 
 	go srv._task_spawn_cli(connChn)
 	go srv._task_cleanup()
+
+	//for connectionless conns (http, udp)
 }
 
 func (srv *ConnSrv) Stop() {
@@ -117,7 +121,7 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 		select {
 		case c := <-connChn:
 			cli := srv.SpawnConnCli(c)
-			ulog.Log().I("conncli", "new cli spawned "+cli.Conn.GetRemoteAddr())
+			ulog.Log().I("connsrv", "new cli spawned "+cli.Conn.GetRemoteAddr())
 			srv.CliSet[cli.Conn.GetRemoteAddr()] = cli
 
 			cli.HandleMsg = func(msg *coder.ZeroMsg) {
@@ -143,11 +147,10 @@ func (srv *ConnSrv) _task_cleanup() {
 	for srv.State == SRV_STATE_ON {
 		select {
 		case <-tic.C:
-			// ulog.Log().I("connsrv", "cleaning up inactive cli")
 			for k, cli := range srv.CliSet {
 				if utils.CurrentTime()-cli.lastMsgAt > srv.MsgTimeout {
 					//inactive cli, remove
-					// ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
+					// 		// ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
 					cli.Stop()
 					delete(srv.CliSet, k)
 				}

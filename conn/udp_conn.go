@@ -4,15 +4,23 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
 )
 
+type UdpCli struct {
+	RemoteAddr string
+}
+
 type UdpConn struct {
 	BaseConn
 	c *net.UDPConn
+
+	cliSet     map[string]*UdpConn
+	serverSide bool
 }
 
 func NewUdpConn(cfg *ConnCfg) *UdpConn {
@@ -37,7 +45,7 @@ func NewUdpConn(cfg *ConnCfg) *UdpConn {
 			sigRw:     sigRw,
 			cancelRw:  cancelRw,
 		},
-		c: nil,
+		cliSet: make(map[string]*UdpConn),
 	}
 	return c
 }
@@ -54,22 +62,36 @@ func (c *UdpConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	udp, err := net.DialTimeout("udp", utils.IpPortJoin(c.RemoteAddr, c.Port), time.Duration(c.Timeout)*time.Millisecond)
+	var udp net.Conn
+	var err error
+	var laddr string
+	if len(strings.Split(c.RemoteAddr, ":")) > 1 {
+		laddr = c.RemoteAddr
+	} else {
+		laddr = utils.IpPortJoin(c.RemoteAddr, c.Port)
+	}
+
+	udp, err = net.DialTimeout("udp", laddr, time.Duration(c.Timeout)*time.Millisecond)
 
 	if err != nil {
 		ulog.Log().I("udpconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
 	} else {
+
 		//renew conn and rw control
-		ulog.Log().I("tcpconn", fmt.Sprintf("connected to %s:%d", c.RemoteAddr, c.Port))
+		ulog.Log().I("udpconn", fmt.Sprintf("connected to %s:%d", c.RemoteAddr, c.Port))
+		udp.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
+		c.serverSide = false //mark the conn to avoid exceptional close
 		c.State = CONN_STATE_CONNECTED
 		c.Io <- CONN_STATE_CONNECTED
 		c.c = udp.(*net.UDPConn)
-		c.sigRw, c.cancelRw = context.WithCancel(context.Background())
+		c.RemoteAddr = udp.RemoteAddr().String()
 
-		// stop previous tasks
+		// stop previous tasks & create new sig
 		c.cancelRw()
+
+		c.sigRw, c.cancelRw = context.WithCancel(context.Background())
 		go c._task_recv(c.sigRw)
 		go c._task_send(c.sigRw)
 		return 0
@@ -89,6 +111,7 @@ func (c *UdpConn) Disconnect() int {
 	if c.c != nil {
 		c.c.Close()
 	}
+	delete(c.cliSet, c.RemoteAddr)
 	return 0
 }
 
@@ -98,37 +121,61 @@ func (c *UdpConn) Disconnect() int {
  * @return 0 if success, -1 if failed
  */
 func (c *UdpConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan Conn) {
+	laddr, err := net.ResolveUDPAddr("udp4", utils.IpPortJoin("127.0.0.1", c.Port))
+	if err != nil {
+		ulog.Log().E("udpconn", "address format err")
+		c.Close()
+		return
+	}
+	cc, err := net.ListenUDP("udp", laddr)
+	if err != nil {
+		ulog.Log().E("udpconn", "listen failed")
+		c.Close()
+		return
+	}
+
 	for c.State != CONN_STATE_CLOSED {
 		select {
 		case <-sigRun.Done():
 			return
 		default:
-			laddr, err := net.ResolveUDPAddr("udp", utils.IpPortJoin("127.0.0.1", c.Port))
-			if err != nil {
-				ulog.Log().E("udpconn", "address format err")
-				c.Close()
-				return
-			}
+			bs := make([]byte, 1024)
+			n, remoteAddr, err := cc.ReadFromUDP(bs)
 
-			cc, err := net.ListenUDP("udp", laddr)
 			if err != nil {
-				// ulog.Log().E("udpconn", "listen failed")
 				continue
 			}
 
-			cfg := ctxCfg.Value(utils.CtxKeyCfg{}).(*ConnCfg)
-			udp := NewUdpConn(cfg)
-			ulog.Log().I("udpconn", "new udpconn, remoteaddr: ")
-			// udp.RemoteAddr = cc.RemoteAddr().String()
-			udp.c = cc
-			udp.State = CONN_STATE_CONNECTED
-			udp.lastConnectAt = utils.CurrentTime()
-			udp.sigRun, udp.cancelRun = context.WithCancel(context.Background())
-			udp.sigRw, udp.cancelRw = context.WithCancel(context.Background())
-			go udp._task_recv(udp.sigRw)
-			go udp._task_send(udp.sigRw)
+			if _, ok := c.cliSet[remoteAddr.String()]; ok {
+				cli := c.cliSet[remoteAddr.String()]
+				cli.Rx <- bs[:n]
+				cli.lastRecvAt = utils.CurrentTime()
+			} else {
+				//new udp conn
+				udp := &UdpConn{
+					BaseConn: BaseConn{
+						RemoteAddr: remoteAddr.String(),
+						Tx:         make(chan []byte, 32),
+						Rx:         make(chan []byte, 32),
+						Io:         make(chan int),
+					},
+					c:          cc,
+					serverSide: true,
+				}
 
-			ch <- udp
+				udp.State = CONN_STATE_CONNECTED
+				udp.lastConnectAt = utils.CurrentTime()
+				udp.sigRun, udp.cancelRun = context.WithCancel(context.Background())
+				udp.sigRw, udp.cancelRw = context.WithCancel(context.Background())
+				// go udp._task_recv(udp.sigRw)
+				go udp._task_send(udp.sigRw)
+
+				c.cliSet[remoteAddr.String()] = udp
+				ch <- udp
+				udp.Rx <- bs[:n]
+
+			}
+
 		}
 	}
 }
@@ -147,26 +194,12 @@ func (c *UdpConn) Close() int {
 	c.Io <- CONN_STATE_CLOSED
 	c.cancelRw()
 	c.cancelRun()
-	if c.c != nil {
+
+	if c.c != nil && !c.serverSide {
 		c.c.Close()
 	}
+	delete(c.cliSet, c.RemoteAddr)
 	return 0
-}
-
-func (c *UdpConn) Read(bs []byte) (n int) {
-	if c.State != CONN_STATE_CONNECTED {
-		return -1
-	}
-
-	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-
-	n, err := c.c.Read(bs)
-	if err != nil {
-		ulog.Log().E("udpconn", "read failed")
-		c.Disconnect()
-		return -1
-	}
-	return
 }
 
 func (c *UdpConn) Write(bs []byte) int {
@@ -174,21 +207,33 @@ func (c *UdpConn) Write(bs []byte) int {
 		return -1
 	}
 
-	c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
-	n, err := c.c.Write(bs)
+	var err error
+	laddr, err := net.ResolveUDPAddr("udp", c.RemoteAddr)
 	if err != nil {
-		ulog.Log().E("udpconn", "write failed")
+		ulog.Log().E("udpconn", "address resolve error")
+		c.Disconnect()
+	}
+
+	var n int
+	if c.serverSide {
+		n, err = c.c.WriteToUDP(bs, laddr)
+	} else {
+		c.c.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		n, err = c.c.Write(bs)
+	}
+	if err != nil {
+		ulog.Log().E("udpconn", "write failed"+err.Error())
 		c.Disconnect()
 		return -1
 	}
 	return n
+
 }
 
-// tasks
-func (c *UdpConn) _task_recv(ctx context.Context) {
+func (c *UdpConn) _task_recv(sigRw context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
-		case <-ctx.Done():
+		case <-sigRw.Done():
 			return
 		default:
 			bs := make([]byte, 1024)
@@ -198,6 +243,16 @@ func (c *UdpConn) _task_recv(ctx context.Context) {
 			}
 		}
 	}
+}
+func (c *UdpConn) Read(bs []byte) int {
+	c.c.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+	n, err := c.c.Read(bs)
+	if err != nil {
+		ulog.Log().E("udpconn", "read failed")
+		c.Disconnect()
+		return -1
+	}
+	return n
 }
 
 func (c *UdpConn) _task_send(ctx context.Context) {
