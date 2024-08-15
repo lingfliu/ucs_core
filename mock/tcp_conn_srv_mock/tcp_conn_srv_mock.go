@@ -17,7 +17,7 @@ func main() {
 	cliConnCfg := &conn.ConnCfg{
 		RemoteAddr: "127.0.0.1",
 		Port:       12001,
-		Class:      conn.CONN_CLASS_TCP,
+		Class:      conn.CONN_CLASS_UDP,
 
 		Timeout:        1000 * 1000 * 1000,
 		TimeoutRw:      1000 * 1000 * 1000,

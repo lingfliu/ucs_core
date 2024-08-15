@@ -50,15 +50,13 @@ type ConnCli struct {
 }
 
 func NewConnCli(connCfg *ConnCfg, cb *coder.Codebook) *ConnCli {
-	ctx, cancel := context.WithCancel(context.Background())
-	ctx2, cancel2 := context.WithCancel(context.Background())
 	codebook := cb
 	var c Conn
 	switch connCfg.Class {
 	case CONN_CLASS_TCP:
 		c = NewTcpConn(connCfg)
-	// case CONN_CLASS_UDP:
-	// c = NewUdpConn(connCfg)
+	case CONN_CLASS_UDP:
+		c = NewUdpConn(connCfg)
 	// case CONN_CLASS_QUIC:
 	// c = NewQuicConn(connCfg)
 	default:
@@ -69,6 +67,8 @@ func NewConnCli(connCfg *ConnCfg, cb *coder.Codebook) *ConnCli {
 		return nil
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	ctx2, cancel2 := context.WithCancel(context.Background())
 	cli := &ConnCli{
 		State: CLI_STATE_DISCONNECTED,
 		Conn:  c,
@@ -186,17 +186,14 @@ func (cli *ConnCli) StartRw() {
 	go cli._task_encode(tx)
 	go cli._task_handle_msg()
 	go cli._task_handle_connect(cli.Conn.GetIo())
-
-	// if cli.Mode == CLI_MODE_SPAWN {
 	go cli._task_pingpong()
-	// }
 }
 
 func (cli *ConnCli) Disconnect() {
 	cli.Conn.Disconnect()
 }
 
-func (cli *ConnCli) Close() {
+func (cli *ConnCli) Stop() {
 	cli.State = CLI_STATE_CLOSED
 	cli.Conn.Close()
 	cli.cancelRun()

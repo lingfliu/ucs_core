@@ -91,8 +91,8 @@ func (c *TcpConn) Disconnect() int {
 		return -2
 	}
 
-	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
+	c.lastDisconnectAt = utils.CurrentTime()
 
 	c.Io <- CONN_STATE_DISCONNECTED
 

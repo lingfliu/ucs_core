@@ -58,7 +58,7 @@ func (srv *ConnSrv) Start() {
 	case CONN_CLASS_TCP:
 		srv.Conn = NewTcpConn(srv.ConnCfg)
 	case CONN_CLASS_UDP:
-		// srv.Conn = NewUdpConn(srv.ConnCfg)
+		srv.Conn = NewUdpConn(srv.ConnCfg)
 	default:
 		srv.Conn = NewTcpConn(srv.ConnCfg)
 	}
@@ -74,7 +74,7 @@ func (srv *ConnSrv) Stop() {
 	srv.State = SRV_STATE_OFF
 	srv.cancelRun()
 	for _, v := range srv.CliSet {
-		v.Close()
+		v.Stop()
 	}
 	for k := range srv.CliSet {
 		delete(srv.CliSet, k)
@@ -127,16 +127,6 @@ func (srv *ConnSrv) _task_spawn_cli(connChn chan Conn) {
 			}
 			srv.PrepareConn(cli)
 			cli.StartRw()
-			// go func(cli *ConnCli) {
-			// 	select {
-			// 	case io := <-cli.Io:
-			// 		if io == CONN_STATE_DISCONNECTED {
-			// 			ulog.Log().I("conncli", "cli disconnected "+cli.Conn.GetRemoteAddr())
-			// 			cli.Close()
-			// 			delete(srv.CliSet, cli.Conn.GetRemoteAddr())
-			// 		}
-			// 	}
-			// }(cli)
 		case <-srv.sigRun.Done():
 			return
 		}
@@ -158,7 +148,7 @@ func (srv *ConnSrv) _task_cleanup() {
 				if utils.CurrentTime()-cli.lastMsgAt > srv.MsgTimeout {
 					//inactive cli, remove
 					// ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
-					cli.Close()
+					cli.Stop()
 					delete(srv.CliSet, k)
 				}
 			}

@@ -80,9 +80,7 @@ func (c *BaseConn) _task_recv(ctx context.Context) {
 			return
 		default:
 			ulog.Log().E("baseconn", "task recv not implemented")
-			// bs := make([]byte, 1024)
-			// c.Read(bs)
-			// c.Rx <- bs
+
 		}
 	}
 }
@@ -93,11 +91,7 @@ func (c *BaseConn) _task_send(ctx context.Context) {
 		case buff := <-c.Tx:
 			buff[0] = 0
 			ulog.Log().E("baseconn", "task send not implemented")
-			// if len(buff) == 0 {
-			// 	continue
-			// } else {
-			// 	c.Write(buff)
-			// }
+
 		case <-ctx.Done():
 			return
 		}

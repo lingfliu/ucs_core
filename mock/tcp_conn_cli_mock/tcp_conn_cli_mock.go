@@ -18,7 +18,7 @@ func main() {
 	cfg := &conn.ConnCfg{
 		RemoteAddr:     "127.0.0.1",
 		Port:           12001,
-		Class:          conn.CONN_CLASS_TCP,
+		Class:          conn.CONN_CLASS_UDP,
 		Timeout:        1000 * 1000 * 1000,
 		TimeoutRw:      1000 * 1000 * 1000,
 		KeepAlive:      true,
@@ -40,7 +40,7 @@ func main() {
 	for {
 		select {
 		case <-s:
-			cli.Close()
+			cli.Stop()
 			return
 		default:
 			time.Sleep(1000 * time.Millisecond)

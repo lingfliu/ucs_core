@@ -16,7 +16,6 @@ type QuicConn struct {
 	BaseConn
 	c      quic.Connection
 	stream quic.Stream
-	ctx    context.Context
 }
 
 func NewQuicConn(cfg *ConnCfg) *QuicConn {
