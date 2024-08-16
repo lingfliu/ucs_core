@@ -18,7 +18,7 @@ func main() {
 	cfg := &conn.ConnCfg{
 		RemoteAddr:     "127.0.0.1",
 		Port:           12001,
-		Class:          conn.CONN_CLASS_UDP,
+		Class:          conn.CONN_CLASS_QUIC,
 		Timeout:        1000 * 1000 * 1000,
 		TimeoutRw:      1000 * 1000 * 1000,
 		KeepAlive:      true,

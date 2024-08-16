@@ -9,7 +9,9 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
@@ -65,8 +67,8 @@ func (c *QuicConn) Connect() int {
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := context.Background() //.WithCancel(context.Background())
+	// defer cancel()
 	qc, err = quic.DialAddr(ctx, utils.IpPortJoin(c.RemoteAddr, c.Port), tlsCfg, nil)
 	if err != nil {
 		ulog.Log().I("quicconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port)+" "+err.Error())
@@ -111,6 +113,7 @@ func (c *QuicConn) Disconnect() int {
 	c.State = CONN_STATE_DISCONNECTED
 
 	c.Io <- CONN_STATE_DISCONNECTED
+	c.cancelRw()
 
 	err := c.c.CloseWithError(0, "")
 	if err != nil {
@@ -125,7 +128,16 @@ func (c *QuicConn) Disconnect() int {
 
 func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan Conn) {
 
+	// udpConn, err := net.ListenUDP("udp", &net.UDPAddr{Port: c.Port})
+	// if err != nil {
+	// 	ulog.Log().E("quicconn", "listen failed, check port")
+	// 	c.Close()
+	// 	return
+	// }
+	// tr := &quic.Transport{Conn: udpConn}
+
 	ln, err := quic.ListenAddr(utils.IpPortJoin("0.0.0.0", c.Port), generateTLSConfig(), nil)
+	// ln, err := tr.Listen(generateTLSConfig(), nil)
 	if err != nil {
 		ulog.Log().E("quicconn", "listen failed, check config")
 		c.Close()
@@ -143,29 +155,24 @@ func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch cha
 			}
 
 			stream, err := cc.AcceptStream(context.Background())
-			if err != nil {
-				ulog.Log().E("quicconn", "stream open failed: "+err.Error())
-				continue
-			}
-			qc := &QuicConn{
-				BaseConn: BaseConn{
-					State:      CONN_STATE_CONNECTED,
-					Class:      CONN_CLASS_TCP,
-					KeepAlive:  c.KeepAlive,
-					Timeout:    c.Timeout,
-					TimeoutRw:  c.TimeoutRw,
-					LocalAddr:  c.LocalAddr,
-					RemoteAddr: cc.RemoteAddr().String(),
-					Port:       c.Port,
-					Rx:         make(chan []byte, 32),
-					Tx:         make(chan []byte, 32),
-					Io:         make(chan int),
-				},
-				c:      cc,
-				stream: stream,
-			}
+			// stream, err := cc.AcceptStream(context.Background())
+			io.Copy(stream, stream)
 
-			ch <- qc //TODO: test the channel for new conn handling
+			// if err != nil {
+			// 	continue
+			// }
+			// cfg := ctxCfg.Value(utils.CtxKeyCfg{}).(*ConnCfg)
+			// qc := NewQuicConn(cfg)
+			// qc.c = cc
+			// qc.stream = stream
+			// qc.RemoteAddr = cc.RemoteAddr().String()
+			// qc.State = CONN_STATE_CONNECTED
+			// qc.sigRun, qc.cancelRun = context.WithCancel(context.Background())
+			// qc.sigRw, qc.cancelRw = context.WithCancel(context.Background())
+			// go qc._task_recv(qc.sigRw)
+			// go qc._task_send(qc.sigRw)
+
+			// ch <- qc
 		}
 	}
 }
@@ -177,13 +184,16 @@ func (c *QuicConn) _task_recv(sigRw context.Context) {
 			return
 		default:
 			buff := make([]byte, 1024)
-			// c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
+			c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
 			n, err := c.stream.Read(buff)
+			ulog.Log().I("quicconn", "recv len: "+strconv.Itoa(n))
 			if err != nil {
-				//TODO: handling disconnect
-				ulog.Log().I("quicconn", "stream read error: "+err.Error())
-				c.Disconnect()
-				return
+				if err == io.EOF {
+					c.Disconnect()
+					return
+				}
+				//do not handle timeout here
+				continue
 			}
 			if n > 0 {
 				c.Rx <- buff[:n]
@@ -196,9 +206,7 @@ func (c *QuicConn) _task_send(sigRw context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:
-
 			if len(buff) == 0 {
-				// time.Sleep(100 * time.Millisecond)
 				continue
 			}
 			err := c.stream.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
@@ -206,12 +214,14 @@ func (c *QuicConn) _task_send(sigRw context.Context) {
 				c.Disconnect()
 				return
 			}
-			_, err = c.stream.Write(buff)
+			n, err := c.stream.Write(buff)
 			if err != nil {
+				ulog.Log().E("quicconn", "write failed")
 				c.Disconnect()
 				return
 			}
-			ulog.Log().I("quicconn", "send data to remote")
+
+			ulog.Log().E("quicconn", "writen to stream len: "+strconv.Itoa(n))
 		case <-sigRw.Done():
 			return
 		}

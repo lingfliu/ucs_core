@@ -17,7 +17,7 @@ func main() {
 	cliConnCfg := &conn.ConnCfg{
 		RemoteAddr: "127.0.0.1",
 		Port:       12001,
-		Class:      conn.CONN_CLASS_UDP,
+		Class:      conn.CONN_CLASS_QUIC,
 
 		Timeout:        1000 * 1000 * 1000,
 		TimeoutRw:      1000 * 1000 * 1000,
@@ -27,7 +27,7 @@ func main() {
 
 	cb := coder.NewCodebookFromJson("{}")
 	srv := conn.NewConnSrv(cliConnCfg, cb)
-	srv.MsgTimeout = 1000 * 1000 * 1000
+	srv.MsgTimeout = 5000 * 1000 * 1000
 
 	srv.MsgHandler = func(cc *conn.ConnCli, msg *coder.ZeroMsg) {
 		ulog.Log().I("main", "msg from cli: "+cc.Conn.GetRemoteAddr()+" msg class: "+strconv.Itoa(msg.Class))

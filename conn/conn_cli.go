@@ -42,7 +42,8 @@ type ConnCli struct {
 	sigRun    context.Context
 	cancelRun context.CancelFunc
 
-	lastMsgAt int64
+	lastMsgAt  int64
+	MsgTimeout int64
 
 	//callbacks
 	//TODO: add internal handling
@@ -57,8 +58,8 @@ func NewConnCli(connCfg *ConnCfg, cb *coder.Codebook) *ConnCli {
 		c = NewTcpConn(connCfg)
 	case CONN_CLASS_UDP:
 		c = NewUdpConn(connCfg)
-	// case CONN_CLASS_QUIC:
-	// c = NewQuicConn(connCfg)
+	case CONN_CLASS_QUIC:
+		c = NewQuicConn(connCfg)
 	default:
 		c = NewTcpConn(connCfg)
 	}
@@ -77,7 +78,8 @@ func NewConnCli(connCfg *ConnCfg, cb *coder.Codebook) *ConnCli {
 		Codebook: codebook,
 		Coder:    coder.NewZeroCoder(),
 
-		txMsg: make(chan *coder.ZeroMsg, 32),
+		txMsg:      make(chan *coder.ZeroMsg, 32),
+		MsgTimeout: 5 * 1000 * 1000 * 1000,
 
 		sigCoding:    ctx,
 		cancelCoding: cancel,
@@ -91,6 +93,9 @@ func (cli *ConnCli) _task_decode(rx chan []byte) {
 	for cli.State == CLI_STATE_CONNECTED || cli.State == CLI_STATE_AUTH {
 		select {
 		case bs := <-rx:
+			if len(bs) < 1 {
+				continue
+			}
 			cli.Coder.FastDecode(bs)
 		case <-cli.sigCoding.Done():
 			return
@@ -139,6 +144,26 @@ func (cli *ConnCli) _task_encode(tx chan []byte) {
 	}
 }
 
+func (cli *ConnCli) _task_keepalive(io chan int) {
+	tic := time.NewTicker(time.Duration(1) * time.Second)
+	for cli.State == CLI_STATE_CONNECTED {
+		select {
+		case <-tic.C:
+			if utils.CurrentTime()-cli.lastMsgAt > cli.MsgTimeout {
+				ulog.Log().E("conncli", "msg timeout")
+				cli.Disconnect()
+				return
+			}
+		case <-cli.sigRun.Done():
+			return
+		case state := <-io:
+			if state == CONN_STATE_DISCONNECTED {
+				return
+			}
+		}
+	}
+}
+
 func (cli *ConnCli) _task_handle_connect(io chan int) {
 	for cli.State != CLI_STATE_CLOSED {
 		select {
@@ -154,6 +179,7 @@ func (cli *ConnCli) _task_handle_connect(io chan int) {
 				cli.State = CLI_STATE_CONNECTING
 			case CONN_STATE_CONNECTED:
 				cli.State = CLI_STATE_CONNECTED
+				cli.lastMsgAt = utils.CurrentTime()
 				cli.cancelCoding()
 				//TODO: finish previous decode & encode routines
 				ctx, cancel := context.WithCancel(context.Background())
@@ -161,7 +187,10 @@ func (cli *ConnCli) _task_handle_connect(io chan int) {
 				cli.cancelCoding = cancel
 				//restart decode / encode routines
 				cli.StartRw()
+
+				go cli._task_keepalive(io)
 			}
+
 		case <-cli.sigRun.Done():
 			cli.cancelCoding()
 			return
