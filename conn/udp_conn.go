@@ -82,6 +82,21 @@ func (c *UdpConn) Connect() int {
 		//renew conn and rw control
 		ulog.Log().I("udpconn", fmt.Sprintf("connected to %s:%d", c.RemoteAddr, c.Port))
 		udp.SetWriteDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
+		bs := make([]byte, 32)
+		n, err := udp.Write([]byte("0"))
+		if err != nil || n == 0 {
+			ulog.Log().I("udpconn", fmt.Sprintf("connect to %s:%d failed, write test failed", c.RemoteAddr, c.Port))
+			c.State = CONN_STATE_DISCONNECTED
+			return -1
+		}
+		udp.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
+		n, err = udp.Read(bs)
+		if err != nil || n == 0 {
+			ulog.Log().I("udpconn", fmt.Sprintf("connect to %s:%d failed, read test failed", c.RemoteAddr, c.Port))
+			c.State = CONN_STATE_DISCONNECTED
+			return -1
+		}
+
 		c.serverSide = false //mark the conn to avoid exceptional close
 		c.State = CONN_STATE_CONNECTED
 		c.Io <- CONN_STATE_CONNECTED
@@ -141,6 +156,8 @@ func (c *UdpConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan
 		default:
 			bs := make([]byte, 1024)
 			n, remoteAddr, err := cc.ReadFromUDP(bs)
+			//return immediately some data to keep the conn alive
+			cc.WriteToUDP([]byte("0"), remoteAddr)
 
 			if err != nil {
 				continue
