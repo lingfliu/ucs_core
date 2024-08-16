@@ -1,10 +1,15 @@
 package conn
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
-	"net"
+	"math/big"
 	"time"
 
 	"github.com/lingfliu/ucs_core/ulog"
@@ -15,6 +20,7 @@ import (
 type QuicConn struct {
 	BaseConn
 	c      quic.Connection
+	tlsCfg *tls.Config
 	stream quic.Stream
 }
 
@@ -36,7 +42,8 @@ func NewQuicConn(cfg *ConnCfg) *QuicConn {
 			sigRun:         sigRun,
 			cancelRun:      cancelRun,
 		},
-		c: nil,
+		tlsCfg: generateTLSConfig(),
+		c:      nil,
 	}
 	return c
 }
@@ -52,35 +59,47 @@ func (c *QuicConn) Connect() int {
 
 	tlsCfg := &tls.Config{
 		InsecureSkipVerify: true,
-		NextProtos:         []string{"ucs-quic"},
+		NextProtos:         []string{"ucs"},
 	}
 
 	c.State = CONN_STATE_CONNECTING
 	c.lastConnectAt = utils.CurrentTime()
 
-	qc, err = quic.DialAddr(context.Background(), utils.IpPortJoin(c.RemoteAddr, c.Port), tlsCfg, nil)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	qc, err = quic.DialAddr(ctx, utils.IpPortJoin(c.RemoteAddr, c.Port), tlsCfg, nil)
 	if err != nil {
-		ulog.Log().I("quicconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port))
+		ulog.Log().I("quicconn", fmt.Sprintf("connect to %s:%d failed", c.RemoteAddr, c.Port)+" "+err.Error())
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
 	}
 
 	stream, err = qc.OpenStreamSync(context.Background())
 	if err != nil {
-		ulog.Log().I("quicconn", "stream opening failed")
+		ulog.Log().I("quicconn", "stream opening failed err: "+err.Error())
 		c.State = CONN_STATE_DISCONNECTED
 		return -1
 	}
+
 	c.c = qc
 	c.stream = stream
 
 	c.State = CONN_STATE_CONNECTED
 	c.Io <- CONN_STATE_CONNECTED
 
-	go c._task_recv(c.sigRun)
-	go c._task_send(c.sigRun)
+	sigRw, cancelRw := context.WithCancel(context.Background())
+	c.sigRw = sigRw
+	c.cancelRw = cancelRw
+
+	go c._task_recv(c.sigRw)
+	go c._task_send(c.sigRw)
 
 	return 0
+}
+
+func (c *QuicConn) Start(sigRun context.Context) chan int {
+	go c._task_connect(sigRun)
+	return c.Io
 }
 
 func (c *QuicConn) Disconnect() int {
@@ -91,7 +110,6 @@ func (c *QuicConn) Disconnect() int {
 	c.lastDisconnectAt = utils.CurrentTime()
 	c.State = CONN_STATE_DISCONNECTED
 
-	close(c.Rx)
 	c.Io <- CONN_STATE_DISCONNECTED
 
 	err := c.c.CloseWithError(0, "")
@@ -106,20 +124,11 @@ func (c *QuicConn) Disconnect() int {
 }
 
 func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch chan Conn) {
-	addr := net.UDPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
-		Port: c.Port,
-	}
-	udpconn, err := net.ListenUDP("udp", &addr)
-	if err != nil {
-		ulog.Log().E("quicconn", "listen failed, check port")
-		c.Close()
-		return
-	}
-	tr := &quic.Transport{Conn: udpconn}
-	ln, err := tr.Listen(&tls.Config{InsecureSkipVerify: true}, &quic.Config{})
+
+	ln, err := quic.ListenAddr(utils.IpPortJoin("0.0.0.0", c.Port), generateTLSConfig(), nil)
 	if err != nil {
 		ulog.Log().E("quicconn", "listen failed, check config")
+		c.Close()
 	}
 
 	for c.State != CONN_STATE_CLOSED {
@@ -129,9 +138,14 @@ func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch cha
 		default:
 			cc, err := ln.Accept(context.Background())
 			if err != nil {
-				ulog.Log().E("tcpconn", "listen failed, check port")
-				c.Close()
-				break
+				ulog.Log().E("quicconn", "listen failed, check port")
+				continue
+			}
+
+			stream, err := cc.AcceptStream(context.Background())
+			if err != nil {
+				ulog.Log().E("quicconn", "stream open failed: "+err.Error())
+				continue
 			}
 			qc := &QuicConn{
 				BaseConn: BaseConn{
@@ -147,7 +161,8 @@ func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch cha
 					Tx:         make(chan []byte, 32),
 					Io:         make(chan int),
 				},
-				c: cc,
+				c:      cc,
+				stream: stream,
 			}
 
 			ch <- qc //TODO: test the channel for new conn handling
@@ -155,22 +170,20 @@ func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch cha
 	}
 }
 
-func (c *QuicConn) _task_recv(ctx context.Context) {
-	buff := make([]byte, 1024)
+func (c *QuicConn) _task_recv(sigRw context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
-		case run := <-ctx.Value("conn_trl").(chan bool):
-			if !run {
-				return
-			}
+		case <-sigRw.Done():
+			return
 		default:
-			c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+			buff := make([]byte, 1024)
+			// c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
 			n, err := c.stream.Read(buff)
-
 			if err != nil {
 				//TODO: handling disconnect
+				ulog.Log().I("quicconn", "stream read error: "+err.Error())
 				c.Disconnect()
-				break
+				return
 			}
 			if n > 0 {
 				c.Rx <- buff[:n]
@@ -179,10 +192,11 @@ func (c *QuicConn) _task_recv(ctx context.Context) {
 	}
 }
 
-func (c *QuicConn) _task_send(ctx context.Context) {
+func (c *QuicConn) _task_send(sigRw context.Context) {
 	for c.State == CONN_STATE_CONNECTED {
 		select {
 		case buff := <-c.Tx:
+
 			if len(buff) == 0 {
 				// time.Sleep(100 * time.Millisecond)
 				continue
@@ -197,22 +211,31 @@ func (c *QuicConn) _task_send(ctx context.Context) {
 				c.Disconnect()
 				return
 			}
-		case run := <-ctx.Value("conn_ctrl").(chan bool):
-			if !run {
-				return
-			}
+			ulog.Log().I("quicconn", "send data to remote")
+		case <-sigRw.Done():
+			return
 		}
 	}
 }
 
-func (c *QuicConn) _task_connect() {
-	tic := time.NewTicker(time.Second * 1)
+func (c *QuicConn) _task_connect(sigRun context.Context) {
+	if !c.KeepAlive {
+		return
+	}
+
+	//first connect
+	c.Connect()
+
+	tic := time.NewTicker(time.Duration(1) * time.Second)
+
 	for c.State != CONN_STATE_CLOSED {
 		select {
 		case <-tic.C:
 			if c.State == CONN_STATE_DISCONNECTED && utils.CurrentTime()-c.lastDisconnectAt > c.ReconnectAfter {
 				c.Connect()
 			}
+		case <-sigRun.Done():
+			return
 		}
 	}
 }
@@ -224,6 +247,8 @@ func (c *QuicConn) Close() int {
 	c.State = CONN_STATE_CLOSED
 	if c.c != nil {
 		c.c.CloseWithError(0, "")
+	}
+	if c.stream != nil {
 		c.stream.Close()
 	}
 	c.Io <- CONN_STATE_CLOSED
@@ -232,4 +257,34 @@ func (c *QuicConn) Close() int {
 
 func (c *QuicConn) GetRemoteAddr() string {
 	return c.RemoteAddr
+}
+
+// copied from the quic-go example
+func generateTLSConfig() *tls.Config {
+	key, err := rsa.GenerateKey(rand.Reader, 1024)
+	if err != nil {
+		panic(err)
+	}
+	template := x509.Certificate{SerialNumber: big.NewInt(1)}
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &key.PublicKey, key)
+	if err != nil {
+		panic(err)
+	}
+	keyPEM := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(key)})
+	certPEM := func() []byte {
+		var buf bytes.Buffer
+		if err := pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE", Bytes: certDER}); err != nil {
+			return nil
+		}
+		return buf.Bytes()
+	}()
+
+	tlsCert, err := tls.X509KeyPair(certPEM, keyPEM)
+	if err != nil {
+		panic(err)
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{tlsCert},
+		NextProtos:   []string{"ucs"},
+	}
 }

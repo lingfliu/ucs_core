@@ -59,6 +59,8 @@ func (srv *ConnSrv) Start() {
 		srv.Conn = NewTcpConn(srv.ConnCfg)
 	case CONN_CLASS_UDP:
 		srv.Conn = NewUdpConn(srv.ConnCfg)
+	case CONN_CLASS_QUIC:
+		srv.Conn = NewQuicConn(srv.ConnCfg)
 	default:
 		srv.Conn = NewTcpConn(srv.ConnCfg)
 	}
@@ -151,7 +153,7 @@ func (srv *ConnSrv) _task_cleanup() {
 				if utils.CurrentTime()-cli.lastMsgAt > srv.MsgTimeout {
 					//inactive cli, remove
 					// 		// ulog.Log().I("connsrv", "removing cli: "+k+" inactive for: "+strconv.FormatInt((utils.CurrentTime()-cli.lastMsgAt)/1000/1000, 10)+" ms")
-					cli.Stop()
+					// cli.Stop()
 					delete(srv.CliSet, k)
 				}
 			}

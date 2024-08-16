@@ -130,7 +130,6 @@ func (c *BaseConn) Write(buff []byte) int {
 }
 
 func (c *BaseConn) Start(sigRun context.Context) chan int {
-	// go c.Connect()
 	go c._task_connect(sigRun)
 	return c.Io
 }
