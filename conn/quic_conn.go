@@ -155,25 +155,41 @@ func (c *QuicConn) Listen(sigRun context.Context, ctxCfg context.Context, ch cha
 			}
 
 			stream, err := cc.AcceptStream(context.Background())
-			// stream, err := cc.AcceptStream(context.Background())
-			io.Copy(stream, stream)
+			if err != nil {
+				ulog.Log().E("quicconn", "stream opening failed err: "+err.Error())
+				continue
+			}
 
-			// if err != nil {
-			// 	continue
-			// }
-			// cfg := ctxCfg.Value(utils.CtxKeyCfg{}).(*ConnCfg)
-			// qc := NewQuicConn(cfg)
-			// qc.c = cc
-			// qc.stream = stream
-			// qc.RemoteAddr = cc.RemoteAddr().String()
-			// qc.State = CONN_STATE_CONNECTED
-			// qc.sigRun, qc.cancelRun = context.WithCancel(context.Background())
-			// qc.sigRw, qc.cancelRw = context.WithCancel(context.Background())
-			// go qc._task_recv(qc.sigRw)
-			// go qc._task_send(qc.sigRw)
+			cfg := ctxCfg.Value(utils.CtxKeyCfg{}).(*ConnCfg)
+			qc := NewQuicConn(cfg)
+			qc.c = cc
+			qc.stream = stream
+			qc.RemoteAddr = cc.RemoteAddr().String()
+			qc.State = CONN_STATE_CONNECTED
+			qc.sigRun, qc.cancelRun = context.WithCancel(context.Background())
+			qc.sigRw, qc.cancelRw = context.WithCancel(context.Background())
+			go qc._task_recv(qc.sigRw)
+			go qc._task_send(qc.sigRw)
 
-			// ch <- qc
+			ch <- qc
+			// go c._task_rx(stream)
 		}
+	}
+}
+
+func (c *QuicConn) _task_tx(stream quic.Stream) {
+}
+
+func (c *QuicConn) _task_rx(stream quic.Stream) {
+	for {
+		bs := make([]byte, 1024)
+		stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Millisecond))
+		n, err := stream.Read(bs)
+		if err != nil {
+			ulog.Log().E("quicconn", "read failed"+err.Error())
+			return
+		}
+		ulog.Log().I("quicconn", "read len: "+strconv.Itoa(n))
 	}
 }
 
@@ -186,7 +202,6 @@ func (c *QuicConn) _task_recv(sigRw context.Context) {
 			buff := make([]byte, 1024)
 			c.stream.SetReadDeadline(time.Now().Add(time.Duration(c.TimeoutRw) * time.Nanosecond))
 			n, err := c.stream.Read(buff)
-			ulog.Log().I("quicconn", "recv len: "+strconv.Itoa(n))
 			if err != nil {
 				if err == io.EOF {
 					c.Disconnect()
@@ -214,14 +229,13 @@ func (c *QuicConn) _task_send(sigRw context.Context) {
 				c.Disconnect()
 				return
 			}
-			n, err := c.stream.Write(buff)
+			_, err = c.stream.Write(buff)
 			if err != nil {
 				ulog.Log().E("quicconn", "write failed")
 				c.Disconnect()
 				return
 			}
 
-			ulog.Log().E("quicconn", "writen to stream len: "+strconv.Itoa(n))
 		case <-sigRw.Done():
 			return
 		}
