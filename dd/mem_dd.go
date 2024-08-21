@@ -21,8 +21,8 @@ func topic2int(topic string) uint64 {
 }
 
 type DdMsg struct {
-	topic uint64
-	data  []byte
+	Topic string
+	Data  []byte
 }
 
 type DdMsgCoder struct {
@@ -63,18 +63,18 @@ func (coder *DdMsgCoder) Decode() *DdMsg {
 	}
 
 	coder.Buffer.Peek(coder.buff, 8)
-	topic := utils.Byte2Int(coder.buff, 4, 4, true, true)
+	// topic := utils.Byte2Int(coder.buff, 4, 4, true, true)
 	msgLen := utils.Byte2Int(coder.buff, 8, 10, false, true)
 	if coder.Buffer.Capacity < msgLen+10 {
 		return nil
 	} else {
 		coder.Buffer.Pop(coder.buff, 10+msgLen)
-		msg := &DdMsg{
-			topic: uint64(topic),
-			data:  coder.buff[10 : 10+msgLen],
-		}
+		// msg := &DdMsg{
+		// topic: uint64(topic),
+		// data:  coder.buff[10 : 10+msgLen],
+		// }
 
-		return msg
+		return nil
 	}
 }
 
@@ -131,14 +131,15 @@ func (dd *MemDdSrv) CliSubscribe(topic string, data []byte) {
 func (dd *MemDdSrv) task_recv() {
 	for dd.State == DD_STATE_ON {
 		select {
-		case ddMsg := <-dd.RxMsg:
-			if _, ok := dd.TopicSet[ddMsg.topic]; !ok {
-				continue
-			}
+		case <-dd.RxMsg:
+		// case ddMsg := <-dd.RxMsg:
+		// if _, ok := dd.TopicSet[ddMsg.topic]; !ok {
+		// 	continue
+		// }
 
-			for _, cli := range dd.SubSet[ddMsg.topic] {
-				cli.Coder.TxMsg <- ddMsg
-			}
+		// for _, cli := range dd.SubSet[ddMsg.topic] {
+		// 	cli.Coder.TxMsg <- ddMsg
+		// }
 
 		case <-dd.sigRun.Done():
 			return

@@ -1,5 +1,12 @@
 package dd
 
+const (
+	DD_STATE_DISCONNECTED = 0
+	DD_STATE_CONNECTING   = 1
+	DD_STATE_CONNECTED    = 2
+	DD_STATE_CLOSE        = 3
+)
+
 type DdCli interface {
 	Connect() int
 	Disconnect() int
@@ -12,6 +19,7 @@ type DdCli interface {
 }
 
 type BaseDdCli struct {
-	Host           string
-	SubTopicIdxSet map[string]string //已订阅的topic索引
+	Host     string
+	TopicSet map[string]string //已订阅的topic索引
+	State    int
 }
