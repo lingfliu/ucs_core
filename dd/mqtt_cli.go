@@ -85,11 +85,7 @@ func (cli *MqttCli) Disconnect() {
 }
 
 func (cli *MqttCli) Subscribe(topic string) int {
-	for _, t := range cli.TopicList {
-		if t == topic {
-			return -2 //already subscribed on connect
-		}
-	}
+	ulog.Log().I("mqtt", "subscribed to "+topic)
 
 	if cli.State != DD_STATE_CONNECTED {
 		cli.Connect()
@@ -162,7 +158,6 @@ func (cli *MqttCli) _task_connect() {
 func (cli *MqttCli) _task_subscribe() {
 
 	for _, topic := range cli.TopicList {
-		ulog.Log().I("mqtt", "subscribe to "+topic)
 		ret := cli.Subscribe(topic)
 		if ret < 0 {
 			return
