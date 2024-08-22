@@ -15,11 +15,15 @@ type DdCli interface {
 	Unsubscribe(topic string) int64
 	Publish(topic string, data []byte) int64
 
-	GetSubTopicIdxSet() map[string]string
+	GetSubTopicIdSet() map[string]int64
 }
 
 type BaseDdCli struct {
-	Host     string
-	TopicSet map[string]string //已订阅的topic索引
-	State    int
+	Host      string
+	TopicList []string //已订阅的topic
+	State     int
+
+	RxMsg chan *DdZeroMsg
+	TxMsg chan *DdZeroMsg
+	Io    chan int
 }
