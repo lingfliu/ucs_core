@@ -56,7 +56,7 @@ func main() {
 	// serviceCesync := spec.NewCesyncService(cfg.host, cfg.host_ports)
 }
 
-func _task_mach_data_process(ctx context.Context, ch chan MachData) {
+func _task_mach_data_process(ctx context.Context, ch chan int) {
 	for {
 		select {
 		case <-ch:

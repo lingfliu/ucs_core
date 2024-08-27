@@ -20,7 +20,10 @@ type Codebook struct {
 
 func NewCodebookFromJson(jsonStr string) *Codebook {
 	var codebook *Codebook
-	json.Unmarshal([]byte(jsonStr), &codebook)
+	err := json.Unmarshal([]byte(jsonStr), &codebook)
+	if err != nil {
+		return nil
+	}
 	if codebook == nil {
 		ulog.Log().I("codebook", "json unmarshal failed")
 		return nil
