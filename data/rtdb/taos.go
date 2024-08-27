@@ -8,11 +8,27 @@ import (
 	_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
+const (
+	TAOS_STATE_DISCONNECTED = 0
+	TAOS_STATE_CONNECTED    = 1
+)
+
 type TaosCli struct {
 	Host     string
 	Username string
 	Password string
 	taos     *sql.DB
+
+	Io chan int
+}
+
+func NewTaosCli(Host string, Username string, Password string) *TaosCli {
+	return &TaosCli{
+		Host:     Host,
+		Username: Username,
+		Password: Password,
+		Io:       make(chan int),
+	}
 }
 
 func (cli *TaosCli) Open() {
@@ -20,8 +36,12 @@ func (cli *TaosCli) Open() {
 	if err != nil {
 		ulog.Log().E("tas", "failed to connect to taos")
 	}
-	defer taos.Close()
 	cli.taos = taos
+	cli.Io <- 1
+}
+
+func (cli *TaosCli) Close() {
+	cli.taos.Close()
 }
 
 func (cli *TaosCli) Exec(sql string) {
@@ -40,14 +60,32 @@ func (cli *TaosCli) Query(sql string) *sql.Rows {
 	return rows
 }
 
-func (cli *TaosCli) CreateTable(dbName string, tableName string, columns string) {
+func (cli *TaosCli) CreateSTable(dbName string, tableName string, columns string, tag_columns string) {
 	cli.taos.Exec(fmt.Sprintf("create database if not exist %s", dbName))
 	cli.taos.Exec(fmt.Sprintf("use %s", dbName))
-	cli.taos.Exec(fmt.Sprintf("create table if not exist %s(%s)", tableName, columns))
+	cli.taos.Exec(fmt.Sprintf("create stable if not exist %s(%s) tags(%s)", tableName, columns, tag_columns))
 }
 
-func (cli *TaosCli) Insert(dbName string, tableName string, columns string, values string) {
-	cli.taos.Exec(fmt.Sprintf("insert into %s.%s(%s) values(%s)", dbName, tableName, columns, values))
+func (cli *TaosCli) CreateTable(dbName string, stableName string, tableName string, tags []string) {
+	cli.taos.Exec(fmt.Sprintf("create database if not exist %s", dbName))
+	cli.taos.Exec(fmt.Sprintf("use %s", dbName))
+	tagStr := ""
+	for _, tag := range tags {
+		tagStr += tag + " "
+	}
+	cli.taos.Exec(fmt.Sprintf("create table if not exist using %s, %s(%s)", stableName, tableName, tagStr))
+}
+
+func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
+	columnStr := ""
+	for _, column := range columns {
+		columnStr += column + " "
+	}
+	tagStr := ""
+	for _, tag := range tags {
+		tagStr += tag + " "
+	}
+	cli.taos.Exec(fmt.Sprintf("insert into %s values(%s) tags(%s)", tableName, columnStr, tagStr))
 }
 
 func (cli *TaosCli) QueryAll(dbName string, tableName string) {
@@ -60,8 +98,4 @@ func (cli *TaosCli) QueryAll(dbName string, tableName string) {
 
 func (cli *TaosCli) DeleteById(dbName string, tableName string, id string) {
 	cli.taos.Exec(fmt.Sprintf("delete from %s.%s where id=%s", dbName, tableName, id))
-}
-
-func (cli *TaosCli) Close() {
-	cli.taos.Close()
 }

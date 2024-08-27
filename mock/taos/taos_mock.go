@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/lingfliu/ucs_core/data/rtdb"
@@ -22,9 +21,9 @@ func main() {
 
 func _task_connect_test(cli *rtdb.TaosCli) {
 	cli.Open()
-	cli.CreateTable("ucs", "eval_demo", "ts timestamp, val float")
+	cli.CreateSTable("ucs", "eval_demo", "ts timestamp, val float", "node_id string, offset int")
 	for i := 0; i < 100; i++ {
-		cli.Insert("ucs", "eval_demo", "ts, val", fmt.Sprintf("now, %d", i))
+		cli.Insert("eval_demo", []string{"ts", "val", "node_id", "offset"}, []string{"now", "3.14", "node1"})
 	}
 	defer cli.Close()
 }
