@@ -18,6 +18,9 @@ func topic2int(topic string) uint64 {
 	return 0
 }
 
+/**
+ * currently deprecated
+ */
 type MemDdSrv struct {
 	Qos       int
 	CliSet    map[string]*MemDdCli
