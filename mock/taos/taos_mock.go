@@ -2,30 +2,33 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"strconv"
 
-	"github.com/lingfliu/ucs_core/data/rtdb"
 	"github.com/lingfliu/ucs_core/ulog"
+	_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
 func main() {
 	ulog.Config(ulog.LOG_LEVEL_DEBUG, "", false)
-	var taoDsn = "root:taosdata@tcp(62.234.16.239:6030)/ucs_srv"
+	var taoDsn = "root:taosdata@tcp(62.234.16.239:6030)/ucs"
 	taos, err := sql.Open("taosSql", taoDsn)
 	if err != nil {
-		ulog.Log().E("tas", "failed to connect to taos")
+		ulog.Log().E("tas", "failed to connect to taos, err: "+err.Error())
 		return
 	}
 	defer taos.Close()
 	ulog.Log().I("tas", "connected to taos")
 
-	// //test: create stable
+	//test: create stable
+	sql := fmt.Sprintf("create stable if not exists %s.dp (ts timestamp, v int) tags (dnode_class int, dnode_id int, dp_offset_idx int)", "ucs")
+	_, err = taos.Exec(sql)
 	// _, err = taos.Exec("create stable if not exists ucs_srv.eval_demo (ts timestamp, val float) tags (node_id binary(32), offset_idx int)")
-	// if err != nil {
-	// 	ulog.Log().E("tas", "failed to create stable, err: "+err.Error())
-	// 	return
-	// }
-	// ulog.Log().I("tas", "create stable success")
+	if err != nil {
+		ulog.Log().E("tas", "failed to create stable, err: "+err.Error())
+		return
+	}
+	ulog.Log().I("tas", "create stable success")
 
 	// //test: show stable
 	// rows, err := taos.Query("show stables")
@@ -129,18 +132,7 @@ func main() {
 	// 	Password: "taosdata",
 	// }
 
-	// go _task_connect_test(cli)
 	// for {
 	// 	time.Sleep(1 * time.Second)
 	// }
-}
-
-func _task_connect_test(cli *rtdb.TaosCli) {
-	cli.Open()
-	cli.ShowSTables()
-	cli.CreateSTable("ucs", "eval_demo", "ts timestamp, val float", "node_id string, offset int")
-	for i := 0; i < 100; i++ {
-		cli.Insert("eval_demo", []string{"ts", "val", "node_id", "offset"}, []string{"now", "3.14", "node1"})
-	}
-	defer cli.Close()
 }

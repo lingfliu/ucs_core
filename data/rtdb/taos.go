@@ -15,6 +15,7 @@ const (
 
 type TaosCli struct {
 	Host     string
+	DbName   string
 	Username string
 	Password string
 	taos     *sql.DB
@@ -22,86 +23,115 @@ type TaosCli struct {
 	Io chan int
 }
 
-func NewTaosCli(Host string, Username string, Password string) *TaosCli {
+func NewTaosCli(host string, dbName string, username string, password string) *TaosCli {
 	return &TaosCli{
-		Host:     Host,
-		Username: Username,
-		Password: Password,
+		Host:     host,
+		DbName:   dbName,
+		Username: username,
+		Password: password,
 		Io:       make(chan int),
 	}
 }
 
 func (cli *TaosCli) Open() {
-	taos, err := sql.Open("taosSql", fmt.Sprintf("%s:%s@tcp(%s)", cli.Username, cli.Password, cli.Host))
+	taos, err := sql.Open("taosSql", fmt.Sprintf("%s:%s@tcp(%s)/%s", cli.Username, cli.Password, cli.Host, cli.DbName))
 	if err != nil {
-		ulog.Log().E("tas", "failed to connect to taos")
+		ulog.Log().E("tas", "failed to connect to taos, err: "+err.Error())
 	}
 	cli.taos = taos
-	// cli.Io <- 1
 }
 
 func (cli *TaosCli) Close() {
 	cli.taos.Close()
 }
 
-// func (cli *TaosCli) ShowDatabases() {
-// 	rows, err := cli.taos.Query("show databases")
-// 	if err != nil {
-// 		ulog.Log().E("tas", "failed to query taos")
-// 		return
-// 	}
-// 	defer rows.Close()
-// }
-
-func (cli *TaosCli) ShowSTables() {
-	taos, _ := sql.Open("taosSql", fmt.Sprintf("%s:%s@tcp(%s)", cli.Username, cli.Password, cli.Host))
-
-	rows, err := taos.Query("show stables")
+func (cli *TaosCli) ShowDatabases() []string {
+	databaseList := make([]string, 0)
+	rows, err := cli.taos.Query("show databases")
 	if err != nil {
-		ulog.Log().E("tas", "failed to query taos")
-		return
+		ulog.Log().E("tas", "failed to query taos, err: "+err.Error())
+		return databaseList
 	}
 	defer rows.Close()
+
+	for rows.Next() {
+		var v string
+		rows.Scan(&v)
+		databaseList = append(databaseList, v)
+	}
+	return databaseList
 }
-func (cli *TaosCli) ShowTables() {
+
+func (cli *TaosCli) ShowSTables() []string {
+	stableList := make([]string, 0)
+
+	rows, err := cli.taos.Query("show stables")
+	if err != nil {
+		ulog.Log().E("tas", "failed to query taos, err: "+err.Error())
+		return stableList
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var v string
+		rows.Scan(&v)
+		stableList = append(stableList, v)
+	}
+	return stableList
+}
+func (cli *TaosCli) ShowTables() []string {
+	tableList := make([]string, 0)
 	rows, err := cli.taos.Query("show tables")
 	if err != nil {
-		ulog.Log().E("tas", "failed to query taos")
-		return
+		ulog.Log().E("tas", "failed to query taos, err: "+err.Error())
+		return tableList
 	}
 	defer rows.Close()
+	for rows.Next() {
+		var v string
+		rows.Scan(&v)
+		tableList = append(tableList, v)
+	}
+	return tableList
 }
 
-func (cli *TaosCli) Exec(sql string) {
-	_, err := cli.taos.Exec(sql)
+func (cli *TaosCli) Exec(sql string, args ...any) int {
+	res, err := cli.taos.Exec(sql, args...)
 	if err != nil {
-		ulog.Log().E("tas", "failed to exec taos")
+		ulog.Log().E("tas", "failed to exec taos, err: "+err.Error())
+		return -1
+	} else {
+		affected, err := res.RowsAffected()
+		if err != nil {
+			ulog.Log().E("tas", "failed to get affected rows, err: "+err.Error())
+			return -1
+		} else {
+			ulog.Log().I("tas", "done, affected rows: "+fmt.Sprintf("%d", affected))
+			return 0
+		}
 	}
 }
 
 func (cli *TaosCli) Query(sql string) *sql.Rows {
 	rows, err := cli.taos.Query(sql)
 	if err != nil {
-		ulog.Log().E("tas", "failed to query taos")
+		ulog.Log().E("tas", fmt.Sprintf("failed to query %s, err: "+err.Error(), sql))
 		return nil
 	}
 	return rows
 }
 
-func (cli *TaosCli) CreateSTable(dbName string, tableName string, columns string, tag_columns string) {
-	cli.taos.Exec(fmt.Sprintf("create database if not exist %s", dbName))
-	cli.taos.Exec(fmt.Sprintf("use %s", dbName))
-	cli.taos.Exec(fmt.Sprintf("create stable if not exist %s(%s) tags(%s)", tableName, columns, tag_columns))
+func (cli *TaosCli) CreateSTable(stableName string, columns string, tag_columns string) {
+	cli.taos.Exec(fmt.Sprintf("create stable if not exist %s.%s(%s) tags(%s)", cli.DbName, stableName, columns, tag_columns))
 }
 
-func (cli *TaosCli) CreateTable(dbName string, stableName string, tableName string, tags []string) {
-	cli.taos.Exec(fmt.Sprintf("create database if not exist %s", dbName))
-	cli.taos.Exec(fmt.Sprintf("use %s", dbName))
+func (cli *TaosCli) CreateTable(tableName string, stableName string, tags []string) {
 	tagStr := ""
-	for _, tag := range tags {
-		tagStr += tag + " "
+	tagStr += tags[0]
+	for i := 1; i < len(tags); i++ {
+		tagStr += tags[i] + ","
 	}
-	cli.taos.Exec(fmt.Sprintf("create table if not exist using %s, %s(%s)", stableName, tableName, tagStr))
+	cli.taos.Exec(fmt.Sprintf("create table if not exist %s using %s.%s tags(%s)", tableName, cli.DbName, stableName, tagStr))
 }
 
 func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
@@ -118,6 +148,15 @@ func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
 
 func (cli *TaosCli) QueryAll(dbName string, tableName string) {
 	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s", dbName, tableName))
+	if err != nil {
+		ulog.Log().E("tas", "failed to query taos")
+	}
+	defer rows.Close()
+}
+
+func (cli *TaosCli) QueryByTime(tableName string, tic string, toc string) {
+
+	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s where ts<%s and ts > %s", cli.DbName, tableName, tic, toc))
 	if err != nil {
 		ulog.Log().E("tas", "failed to query taos")
 	}

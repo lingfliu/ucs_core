@@ -2,14 +2,54 @@ package main
 
 import (
 	"context"
-	"sync"
+	"encoding/json"
+	"os"
+	"os/signal"
+	"time"
 
+	"github.com/lingfliu/ucs_core/coder"
+	"github.com/lingfliu/ucs_core/dao"
+	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/ulog"
+	"github.com/lingfliu/ucs_core/utils"
 )
 
-var wg sync.WaitGroup
+// global variables
+type MqttCfg struct {
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	TopicList []string
+	Qos       byte
+	Timeout   int
+}
 
-//global variables
+type TaosCfg struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	DbName   string
+}
+
+var mqttCfg = &MqttCfg{
+	Host:      "62.234.16.239",
+	Port:      1883,
+	Username:  "admin",
+	Password:  "admin1234",
+	TopicList: []string{"ucs/dd/mock"},
+	Qos:       0,
+	Timeout:   3000,
+}
+
+var taosCfg = &TaosCfg{
+	Host:     "62.234.16.239",
+	Port:     6030,
+	Username: "root",
+	Password: "taosdata",
+	DbName:   "ucs",
+}
 
 func main() {
 	//config log
@@ -17,84 +57,59 @@ func main() {
 
 	// //service initialization
 
-	// //membuff
-	// memBuff := membuff.CreateMemBuff(cfg.memBuffSize)
+	// open mqttCli
+	mqttCli := dd.NewMqttCli(utils.IpPortJoin(mqttCfg.Host, mqttCfg.Port), mqttCfg.Username, mqttCfg.Password, mqttCfg.TopicList, mqttCfg.Qos, mqttCfg.Timeout)
+	dpDao := dao.NewDpDao(taosCfg.Host, taosCfg.DbName, taosCfg.Username, taosCfg.Password)
 
-	// //mq
-	// //1. inmem-mq: memq
-	// meMq := mq.CreateMq(cfg.mqAddr, cfg.mqPort, cfg.mqUser, cfg.mqPwd, cfg.mqVhost)
-	// //2. emqx
-	// mqttCli := cli.CreateMqttClient(cfg.mqttAddr, cfg.mqttPort, cfg.mqttUser, cfg.mqttPwd)
-	// //3. nsq mq
-	// nsqMq := mq.CreateNsqMq(cfg.nsqAddr, cfg.nsqPort)
-	// //4. kafka mq
-	// kafkaMq := mq.CreateKafkaMq(cfg.kafkaAddr, cfg.kafkaPort)
+	mqttCli.Start()
+	go _task_dao_init(dpDao)
 
-	// //dba
-	// redisCli := dba.CreateRedisClient(cfg.redisAddr, cfg.redisPort, cfg.redisPwd, cfg.redisDb)
-	// sqlCli := dba.CreateSqlClient(cfg.sqlAddr, cfg.sqlPort, cfg.sqlUser, cfg.sqlPwd, cfg.sqlDb)
-	// mongoCli = dba.CreateMongoClient(cfg.mongoAddr, cfg.mongoPort, cfg.mongoUser, cfg.mongoPwd, cfg.mongoDb)
-	// minioCli = dba.CreateMinioClient(cfg.minioAddr, cfg.minioPort, cfg.minioUser, cfg.minioPwd)
+	sigRun, cancelRun := context.WithCancel(context.Background())
+	go _task_recv_mqtt(sigRun, mqttCli, dpDao)
 
-	//service discovery
-	//start go-zero services
-
-	// global context
-	// ctxGlobal := context.Background()
-
-	// start conn servers
-	// srvMach := spec.NewMachServer(cfg.mach.port)
-	// dataCh := srvMach.Expose()
-	// go _task_mach_data_process(dataCh)
-	// srvMach.Start()
-	// srvIot := spec.NewIotServer(cfg.mqtt)
-	// srvIot.Start()
-	// srvStream := spec.NewNsServer(cfg.port)
-	// srvStream.Start()
-
-	// //start cloud-edge sync service
-	// serviceCesync := spec.NewCesyncService(cfg.host, cfg.host_ports)
-}
-
-func _task_mach_data_process(ctx context.Context, ch chan int) {
+	s := make(chan os.Signal, 1)
+	signal.Notify(s, os.Interrupt)
 	for {
 		select {
-		case <-ch:
-			go func() {
-				// serviceMachDataProcess.
-				// 	Filter(data).
-				// 	Then().
-				// 	Align().
-				// 	Then().
-				// 	Publish()
-			}()
-		case <-ctx.Done():
-			break
+		case <-s:
+			cancelRun()
+			mqttCli.Stop()
+			dpDao.Close()
+			return
+		default:
+			time.Sleep(1 * time.Second)
+		}
+	}
+
+}
+
+func _task_dao_init(dao *dao.DpDao) {
+	dao.Open()
+	dao.Init()
+}
+
+func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDao *dao.DpDao) {
+	//task: receive mqtt message
+	for {
+		select {
+		case <-sigRun.Done():
+			return
+		case msg := <-mqttCli.RxMsg:
+			//parse mqtt message
+			switch msg.Topic {
+			case "dp":
+				//payload is encoded by DpCoder: [ts, dnode id, dp offsetidx, int value]
+				dpMsg := &coder.DpMsg{}
+				err := json.Unmarshal(msg.Data, dpMsg)
+				if err != nil {
+					ulog.Log().E("main", "dp msg decode error: "+err.Error())
+				} else {
+					//insert into taos
+					ulog.Log().I("main", "insert dp msg: "+string(msg.Data))
+					dpDao.Insert(dpMsg)
+				}
+
+			}
 		}
 	}
 }
-
-// func _task_consume(rx chan int) {
-// 	defer wg.Done()
-// 	for {
-// 		b := <-rx
-// 		// print(b)
-// 		output := struct {
-// 			Value int
-// 		}{
-// 			Value: b,
-// 		}
-
-// 		ulog.Log().W("main", output)
-// 	}
-// }
-// func _task_feed(rx chan int) {
-// 	defer wg.Done()
-
-// 	cnt := 0
-// 	tic := time.NewTicker(time.Millisecond * 10)
-// 	for range tic.C {
-// 		rx <- cnt
-// 		cnt++
-// 	}
-// }
