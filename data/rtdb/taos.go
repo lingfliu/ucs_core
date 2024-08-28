@@ -37,11 +37,39 @@ func (cli *TaosCli) Open() {
 		ulog.Log().E("tas", "failed to connect to taos")
 	}
 	cli.taos = taos
-	cli.Io <- 1
+	// cli.Io <- 1
 }
 
 func (cli *TaosCli) Close() {
 	cli.taos.Close()
+}
+
+// func (cli *TaosCli) ShowDatabases() {
+// 	rows, err := cli.taos.Query("show databases")
+// 	if err != nil {
+// 		ulog.Log().E("tas", "failed to query taos")
+// 		return
+// 	}
+// 	defer rows.Close()
+// }
+
+func (cli *TaosCli) ShowSTables() {
+	taos, _ := sql.Open("taosSql", fmt.Sprintf("%s:%s@tcp(%s)", cli.Username, cli.Password, cli.Host))
+
+	rows, err := taos.Query("show stables")
+	if err != nil {
+		ulog.Log().E("tas", "failed to query taos")
+		return
+	}
+	defer rows.Close()
+}
+func (cli *TaosCli) ShowTables() {
+	rows, err := cli.taos.Query("show tables")
+	if err != nil {
+		ulog.Log().E("tas", "failed to query taos")
+		return
+	}
+	defer rows.Close()
 }
 
 func (cli *TaosCli) Exec(sql string) {
