@@ -55,8 +55,6 @@ func main() {
 	//config log
 	ulog.Config(ulog.LOG_LEVEL_INFO, "./log.log", false)
 
-	// //service initialization
-
 	// open mqttCli
 	mqttCli := dd.NewMqttCli(utils.IpPortJoin(mqttCfg.Host, mqttCfg.Port), mqttCfg.Username, mqttCfg.Password, mqttCfg.TopicList, mqttCfg.Qos, mqttCfg.Timeout)
 	mqttCli.Start()
