@@ -58,8 +58,9 @@ func main() {
 	// open mqttCli
 	mqttCli := dd.NewMqttCli(utils.IpPortJoin(mqttCfg.Host, mqttCfg.Port), mqttCfg.Username, mqttCfg.Password, mqttCfg.TopicList, mqttCfg.Qos, mqttCfg.Timeout)
 	mqttCli.Start()
-	dpDao := dao.NewDpDao(utils.IpPortJoin(taosCfg.Host, taosCfg.Port), taosCfg.DbName, taosCfg.Username, taosCfg.Password)
 
+	//intialize DAO
+	dpDao := dao.NewDpDao(utils.IpPortJoin(taosCfg.Host, taosCfg.Port), taosCfg.DbName, taosCfg.Username, taosCfg.Password)
 	go _task_dao_init(dpDao)
 
 	sigRun, cancelRun := context.WithCancel(context.Background())
