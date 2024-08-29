@@ -41,8 +41,8 @@ func (dao *DpDao) Close() {
 
 func (dao *DpDao) Insert(msg *coder.DpMsg) {
 	for idx, v := range msg.ValueList {
-		tableName := fmt.Sprintf("dp-%d-%d", msg.DnodeId, idx)
-		sql := fmt.Sprintf("insert into %s using dp values (?, ?, ?) tags (?, ?, ?)", tableName)
-		dao.taosCli.Exec(sql, msg.Ts, msg.DnodeId, v, msg.DnodeId, msg.DNodeClass, idx)
+		tableName := fmt.Sprintf("dp_%d_%d", msg.DNodeId, idx)
+		sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values (?, ?)", tableName)
+		dao.taosCli.Exec(sql, msg.DNodeClass, msg.DNodeId, idx, msg.Ts, v)
 	}
 }
