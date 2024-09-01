@@ -1,6 +1,9 @@
-package types
+package model
 
-import "github.com/lingfliu/ucs_core/conn"
+import (
+	"github.com/lingfliu/ucs_core/conn"
+	"github.com/lingfliu/ucs_core/model/gis"
+)
 
 /**
  * 物模型
@@ -28,7 +31,7 @@ type BaseThing struct {
 	Gw ThingGw //nil if direct connect to the server
 
 	//全局坐标
-	GPos GPos
+	GPos gis.GPos
 	//速度
 	Velo [3]float64 //速度：x,y,z unit: m/s
 

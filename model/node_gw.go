@@ -1,4 +1,4 @@
-package types
+package model
 
 type NodeGw struct {
 	// connMeta *ConnMeta

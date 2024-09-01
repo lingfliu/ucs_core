@@ -1,4 +1,4 @@
-package types
+package model
 
 const DATA_CLASS_INT = 1
 const DATA_CLASS_FLOAT = 2

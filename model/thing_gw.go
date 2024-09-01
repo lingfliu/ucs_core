@@ -1,4 +1,6 @@
-package types
+package model
+
+import "github.com/lingfliu/ucs_core/model/gis"
 
 // 物模型网关
 type BaseThingGw struct {
@@ -8,7 +10,7 @@ type BaseThingGw struct {
 	Proto string
 
 	//全局坐标
-	GPos GPos
+	Pos gis.GPos
 	//速度
 	Velo [3]float64 //速度：x,y,z unit: m/s
 
@@ -22,7 +24,7 @@ type BaseThingGw struct {
 }
 
 type ThingGw interface {
-	Split(d *Data) (map[string]*Data, error)
+	// Split(d *Data) (map[string]*Data, error)
 	RegThing(t *BaseThing) error
 	StopThing(t *BaseThing) error
 	RestartThing(t *BaseThing) error

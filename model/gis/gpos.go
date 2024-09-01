@@ -1,4 +1,4 @@
-package types
+package gis
 
 /**
  * 位置信息
@@ -41,9 +41,23 @@ type Velo struct {
 	X float64
 	Y float64
 	Z float64
+}
+
+type Posture struct {
 
 	//角速度 (rad/s)
-	Raw   float64
-	Yaw   float64
-	Pitch float64
+	R float64
+	Y float64
+	P float64
+}
+
+type Quaternion struct {
+	W float64
+	X float64
+	Y float64
+	Z float64
+}
+
+func Overlap(p1 *GPos, p2 *GPos) bool {
+	return false
 }
