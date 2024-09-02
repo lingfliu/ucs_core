@@ -1,8 +1,13 @@
 package model
 
-const DATA_CLASS_INT = 1
-const DATA_CLASS_FLOAT = 2
-const DATA_CLASS_BOOL = 3
+const (
+	DATA_CLASS_RAW   = 0 //in bytes
+	DATA_CLASS_INT   = 1
+	DATA_CLASS_UINT  = 2
+	DATA_CLASS_FLOAT = 3
+	DATA_CLASS_FLAG  = 4
+	// DATA_CLASS_JSON  = 5 //in json string
+)
 
 type PropMeta struct {
 	Name      string

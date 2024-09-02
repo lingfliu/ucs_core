@@ -1,7 +1,4 @@
-create table if not exist device_meta (
-    id SERIAL PRIMARY KEY,
-    mac VARCHAR NOT NULL,
-    key TEXT NOT NULL,
-    value TEXT NOT NULL,
-    UNIQUE(device_id, key)
-);
+create stable if not exists dp_single values (
+    ts timestamp;
+    value int;
+) tags (dnode_id int, dp_id int, dnode_class int, dp_class int);
