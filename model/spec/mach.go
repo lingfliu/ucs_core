@@ -8,6 +8,7 @@ import "github.com/lingfliu/ucs_core/model"
 type Mach struct {
 	model.Thing
 
+	Class      int
 	DNodeSet   map[string]*model.DNode
 	CtlNodeSet map[string]*model.CtlNode
 }
