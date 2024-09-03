@@ -6,9 +6,9 @@ import (
 
 type DPoint struct {
 	Ts       int64
-	Data     []any
 	Id       int64 //dpoint id
 	ParentId int64 //dnode id
+	Data     []any
 	Meta     *DataMeta
 }
 

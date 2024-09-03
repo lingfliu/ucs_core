@@ -14,13 +14,13 @@ type DataMeta struct {
 }
 
 func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any {
-	data := make([]any, len(raw))
+	data := make([]any, dimen)
 	switch class {
-	case DATA_CLASS_RAW:
+	case VAL_CLASS_RAW:
 		for i, val := range raw {
 			data[i] = val
 		}
-	case DATA_CLASS_INT:
+	case VAL_CLASS_INT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//int32
@@ -32,7 +32,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case DATA_CLASS_UINT:
+	case VAL_CLASS_UINT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//int32
@@ -44,7 +44,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case DATA_CLASS_FLOAT:
+	case VAL_CLASS_FLOAT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//float32
@@ -56,7 +56,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case DATA_CLASS_FLAG:
+	case VAL_CLASS_FLAG:
 		for i := 0; i < dimen; i++ {
 			data[i] = raw[i] != 0
 		}

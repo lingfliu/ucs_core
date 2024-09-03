@@ -111,7 +111,7 @@ type AgilorCli struct {
 	Username string
 	Passwd   string
 	State    int
-	c_cli    *C.agilor_cli //TODO: C的操作接口
+	// c_cli    *C.agilor_cli //TODO: C的操作接口
 }
 
 func NewAgilorCli(host string, username string, password string) *AgilorCli {
@@ -130,8 +130,8 @@ func (cli *AgilorCli) Close() {
 
 func (cli *AgilorCli) Insert(p *model.DPoint) {
 	//转换为AgilorDPoint
-	ap := DPoint2AgilorDPoint(p)
-	cli.c_cli.insert(ap) //TODO: 这里调用C接口
+	// ap := DPoint2AgilorDPoint(p)
+	// cli.c_cli.insert(ap) //TODO: 这里调用C接口
 }
 
 /**

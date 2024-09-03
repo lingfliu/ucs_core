@@ -3,15 +3,14 @@ package model
 import "github.com/lingfliu/ucs_core/model/gis"
 
 /**
- * 事件、数据流、数据包，均采用该结构进行声明
+ * 预警事件，均采用该结构进行声明
  */
 type Event struct {
-	//meta
-	Meta *PropMeta
+	Ts   int64
+	GPos gis.GPos //全局坐标
+	LPos gis.LPos //局部坐标
 
-	//content
-	Ts      int64    //timestamp
-	GPos    gis.GPos //全局坐标
-	LPos    gis.LPos //局部坐标
-	Payload []any    //泛型
+	Code       int       //事件码
+	Snapshot   []*DPoint //数据快照
+	AlertLevel int       //告警级别
 }
