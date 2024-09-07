@@ -3,6 +3,7 @@ package rtdb
 import (
 	"strconv"
 
+	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/model"
 	"github.com/lingfliu/ucs_core/ulog"
 )
@@ -106,7 +107,8 @@ const (
  * AgilorCli for Agilor RTDB access
  */
 type AgilorCli struct {
-	Host     string
+	Host     string //ip:port
+	Ip       string
 	Port     int
 	Username string
 	Passwd   string
@@ -184,6 +186,8 @@ func (cli *AgilorCli) AggregateQuery(tic int64, toc int64, window int64, step in
 /**
  * 删除数据
  * @param class: 数据点位类型
+ * @param tic: 开始时间
+ * @param toc: 结束时间
  * class, dNodeId, dPointId 至少需要一个有效参数
  */
 func (cli *AgilorCli) Delete(tic int64, toc int64, class int, dNodeId int64, dPointId int64) {
@@ -224,8 +228,15 @@ func (cli *AgilorCli) DropTable(name string) {
 /****************************************************/
 /* 以下为订阅相关接口，用于订阅数据变化事件 */
 /****************************************************/
-func (cli *AgilorCli) SubscribeDPoint(id int64) int {
+func (cli *AgilorCli) SubscribeDPoint(id int64, callback func(*dd.DdZeroMsg)) int {
 	return 0
+}
+
+func stub(msg *dd.DdZeroMsg) {
+	var cli *AgilorCli
+	cli.SubscribeDPoint(1, func(msg *dd.DdZeroMsg) {
+		cli.RxMsg <- msg
+	})
 }
 
 func (cli *AgilorCli) UnsubscribeDPoint(dPointId int64) int {

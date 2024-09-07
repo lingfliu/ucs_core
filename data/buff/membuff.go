@@ -1,100 +1,59 @@
 package buff
 
 import (
+	"math"
 	"time"
 
-	"github.com/lingfliu/ucs_core/types"
+	"github.com/lingfliu/ucs_core/model/gis"
 )
 
-type MemBuff struct {
-	Buff     map[string][][]any //maximal support for 2D data [time][data + pos]
-	BuffSize map[string]int     //time dimension for different data
-	BuffTs   map[string]int64
-
-	TsBaseline int64
-	TsIdx      int64
-	TsStep     int64
+type MemData struct {
+	Data []uint64 //默认使用uint64进行存储
+	Ts   int64
+	Pos  gis.LPos
 }
 
-func NewMemBuff(TsStep int64) *MemBuff {
-	mb := &MemBuff{
-		TsStep: TsStep,
+func (md *MemData) ReturnAsFloat64() []float64 {
+	data := make([]float64, len(md.Data))
+	for i, d := range md.Data {
+		//from byte to float64
+		data[i] = math.Float64frombits(d)
 	}
-	mb.Init()
+	return data
+}
+
+func (md *MemData) ReturnAsUint64() []uint64 {
+	return md.Data
+}
+
+func (md *MemData) ReturnAsUint32() []uint32 {
+	data := make([]uint32, len(md.Data))
+	for i, d := range md.Data {
+		data[i] = uint32(d)
+	}
+	return data
+}
+
+type MemBuff struct {
+	Buff   map[string][]MemData //maximal support for 2D data [ts][pos index]
+	BuffTs map[string][]int64   //time index
+}
+
+func NewMemBuff(maxTsLen int, maxSpLen int) *MemBuff {
+	mb := &MemBuff{}
 	return mb
 }
 
-func (mb *MemBuff) Init() {
-	mb.Buff = make(map[string][][]any)
-	mb.BuffSize = make(map[string]int)
-
-	//create Ts baseline
-	mb.TsBaseline = time.Now().UnixNano()
-	tsBaseline, tsIdx := calcTsBaseline(mb.TsStep)
-
-	mb.TsBaseline = tsBaseline
-	mb.TsIdx = tsIdx
+func (mb *MemBuff) Push(name string, data []MemData) {
+	mb.Buff[name] = append(mb.Buff[name], data...)
 }
-
-func (mb *MemBuff) Push(name string, data *types.Data) {
-	// stData = mb.StSlice()
-}
-
-// func (mb *MemBuff) StSlice(step int64, data types.Data) *types.Data {
-
-// 	tsIdx := (data.Ts - mb.TsBaseline) % mb.TsStep
-
-// 	dBaseline := &types.Data{
-// 		Meta:    data.Meta,
-// 		Ts:      mb.TsBaseline + tsIdx*mb.TsStep,
-// 		Payload: data.Payload,
-// 	}
-
-// 	return dBaseline
-// }
 
 /**
- * Merge data from different data source with consistent time idx
- * mode:
+ * Spatial-Temporal buff slice
+ * @param name: name of the buffer
+ * @param tic: start time
  */
-func (mb *MemBuff) Merge(mode int, dataName ...string) *types.Data {
-	// dataMerge := types.Data{
-	// 	Meta: &types.PropMeta{
-	// 		Name: "Merge"},
-	// 	Ts: mb.BuffTs[dataName[0]],
-	// }
-
-	// for _, name := range dataName {
-	// 	dataBuff := mb.Buff[name]
-	// 	dataTs := mb.BuffTs[name]
-	// }
-	// stData := make(map[string]*types.Data)
-	// dimenData := make(map[string]int)
-	// for _, name := range dataName {
-	// dimenData[name] = mb.Buff[name][0][0].(int)
-	// }
-
-	data := types.Data{
-		Meta: &types.PropMeta{
-			Name: "Merge",
-		},
-		Ts:      mb.BuffTs[dataName[0]],
-		Payload: make([]any, 0),
-	}
-
-	// for _, name := range dataName {
-	// stData[name] = mb.StSlice(name)
-	// data.Payload[0] = append(data.Payload[0], stData[name].Payload[0])
-	// }
-
-	return &data
-}
-
-func (mb *MemBuff) StSlice(dataName string, timeStep int64, align bool) *types.Data {
-	ts := mb.BuffTs[dataName]
-	if align {
-		ts = (ts%timeStep + 1) * ts
-	}
+func (mb *MemBuff) StSlice(name string, tic int64, toc int64, tStep int64, sStep float32, sparse bool) *MemData {
 
 	//create time index
 	// tsScale := make([]int64, 10)
@@ -109,10 +68,10 @@ func (mb *MemBuff) StSlice(dataName string, timeStep int64, align bool) *types.D
 	// 	t0 += timeStep
 	// }
 
-	return &types.Data{}
+	return &MemData{}
 }
 
-func calcTsBaseline(tsStep int64) (int64, int64) {
+func CalcTsBaseline(tsStep int64) (int64, int64) {
 	ts := time.Now().UnixNano()
 	idx := ts % tsStep
 
