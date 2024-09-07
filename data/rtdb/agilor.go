@@ -78,31 +78,6 @@ const (
 	AGGR_OP_SUM  = 5
 )
 
-// type AlertEvent struct {
-// 	Ts      int64
-// 	Id      int64
-// 	Level   int       //1,2,3...
-// 	Snap    []*DPoint //数据快照
-// 	Descrip string    //描述
-// }
-
-// type AlgTask struct {
-// 	Ts     int64
-// 	Id     int64
-// 	Source []string
-// 	Name   string
-// }
-
-// /**
-//  * Algorithm result
-//  */
-// type AlgEvent struct {
-// 	Ts     int64
-// 	Id     int64
-// 	TaskTs int64
-// 	Name   string
-// }
-
 /**
  * AgilorCli for Agilor RTDB access
  */
