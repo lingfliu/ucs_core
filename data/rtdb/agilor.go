@@ -8,6 +8,136 @@ import (
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
+/****************************************************/
+// C 结构体声明
+/****************************************************/
+// 定义agibool类型，假设这是一个布尔类型
+type AgiBool bool
+
+// 定义枚举类型
+type AgiEnumValue struct {
+	Class int16     // 0x0001：使用key, 0x0002：使用name，0x0003表示同时使用key,name
+	Key   int16     // 枚举(值)
+	Name  [128]byte // 枚举(字符串)
+}
+
+// 模拟union联合体类型
+// TODO 用byte替代
+type AgiValueUnion struct {
+	RVal float32      // 浮点
+	LVal int32        // 长整
+	BVal AgiBool      // 开关
+	SVal [128]byte    // sval  字符串
+	EVal AgiEnumValue // 枚举
+}
+
+// 定义agilor_point_t结构体
+type AgiPoint struct {
+	Tag          [64]byte      // 测点标签 *
+	Descriptor   [32]byte      // 测点描述 #
+	Engunit      [16]byte      // 测点数据单位（安培、摄氏度等） #
+	Id           int32         // 测点编号，由系统配置
+	Class        uint8         // 菜单类型(R浮点数/S字符串/B开关/L整形/E枚举) *
+	Scan         uint8         // 测点扫描标识(0或>=0x80："禁止"， 1："输入", 2："输出" *
+	TypicalValue float32       // 典型值 # @unused
+	ValueUnion   AgiValueUnion // 点值 #
+	EnumDesc     [128]byte     // 枚举描述 （"2:1,2,on:0,3,off"），暂时无用，[hp has not] @unused
+	TimeDate     int64         // 时间戳 (ts)
+	State        int32         // 点状态（点的质量、实时点值、缓冲的点值）
+	// 由系统配置，覆盖添加时=old.state
+	PointSource [32]byte  // 测点的数据源站(设备名) *
+	SourceGroup [32]byte  // 测点的数据源结点组 #
+	SourceTag   [128]byte // 测点的源标签 *
+
+	UpperLimit float32 // 数据上限，用于压缩
+	LowerLimit float32 // 数据下限，用于压缩
+
+	PushRef1 uint16 // 实时推理规则标志 #
+	RuleRef1 uint16 // 实时推理规则标志 #
+
+	// Exception reporting
+	// Exception reporting ensures that a Agilor interface only sends meaningful
+	// data, rather than sending unnecessary data that taxes the system.
+	// 异常报告可确保Agilor接口只发送有意义的数据，而不是发送不必要的数据，从而加重系统的负担。
+
+	// Exception reporting uses a simple deadband algorithm to determine whether
+	// to send events to Agilor Data Archive. For each point, you can set
+	// exception reporting specifications that create the deadband. The interface
+	// ignores values that fall inside the deadband.
+	// 异常报告使用一个简单的死区算法来确定是否将事件发送到PI数据存档。对于每一点，可以设置创建死区的异常报告规范。该接口忽略死区内的值。
+	// TODO: exc_xxx这3个参数，只对接口有效，还是内核中也使用这3个参数？
+	ExcMin int64 // 实时数据处理最短间隔（接口参数）
+	ExcMax int64 // 实时数据处理最大间隔（内核参数）
+	// 不管是否压缩，点值是否变化，当timedate-last_timedate >= exc_max时强制存储数据
+	ExcDev float32 // 实时数据处理偏差（接口参数）：
+	// 当fabs(tagvalue.rval) < fabs(lptag->rval) * (1 - lptag->exc_dev)
+	// 或(fabs(tagvalue.rval) > fabs(lptag->rval) * (1 - lptag->exc_dev)
+	// 表示点值变化超过偏差。这时当点值变化超过偏差且与上次发送的点值时间戳之差>=exc_min
+	// 时，即使是过滤发生，也会将点值发送到内核。
+
+	AlarmType  uint16  // 报警类型
+	AlarmState uint16  // 状态报警
+	AlarmHi    float32 // 上限报警
+	AlarmLo    float32 // 下限报警
+	AlarmHiHi  float32
+	AlarmLoLo  float32
+
+	PriorityHi   uint16 // 报警优先级，暂时不处理
+	PriorityLo   uint16
+	PriorityHiHi uint16
+	PriorityLoLo uint16
+
+	Archive  AgiBool // 是否存储历史数据
+	Compress AgiBool // 是否进行历史压缩 *，但type=O时，compress=agifalse
+	Step     uint8   // 历史数据的插值形式（线形，台阶），compress=agitrue时有效
+	HisIdx   int32   // 历史记录索引号，由系统配置
+
+	// Compression testing
+	CompMin int64   // 压缩最短间隔(压缩最小时间), compress minimum time，暂时无用
+	CompMax int64   // 压缩最长间隔(压缩最大时间), compress maximum time，暂时无用
+	CompDev float32 // 压缩灵敏度（压缩偏差）， compress deviation
+	// 归档时压缩灵敏度=(upper_limit - lower_limit) * comp_dev
+
+	LastVal      float32 // 上次数据存档的值 #  // TODO: 应该使用内存中的？
+	LastTimeDate int64   // 上次数据存档的时间 # // TODO: 应该使用内存中的？
+	CreateDate   int64   // 采集点创建日期，由系统配置
+}
+
+///////////////////////////////////////
+///////////agilor_value_t////////////
+//////////////////////////////////////
+
+// 定义agilor_value_t结构体
+type AgiValue struct {
+	TimeDate int64 // 时间戳
+	State    int32 // 状态 (Agpt_SetPointValue不需要设置state)
+	Class    uint8 // 点值类型
+	BlobSize int32
+	Value    AgiValueUnion // 点值联合体
+}
+
+// 定义agilor_deviceinfo_t结构体
+type AgiDeviceInfo struct {
+	DeviceName [32]byte // 设备名称
+	IsOnline   AgiBool  // 是否在线
+	PointCount int32    // 测量点数量
+}
+
+// 定义agilor_devicepoint_t结构体
+type AgiDevicePoint struct {
+	LocalId   int32     // 本地重新分配的测点id
+	Id        int32     // 测点id
+	SourceTag [128]byte // 测点的源标签
+	ExcDev    float32
+	ExcMin    int64
+	ExcMax    int64
+	Class     uint16
+	Scan      uint16
+	TimeDate  int64
+	State     int32
+	Value     AgiValueUnion // 联合体
+}
+
 /*************************************************/
 /* 缩写声明：DNode*可缩写为Dn*， DPoint可缩写为Dp* */
 /************************************************/
@@ -210,7 +340,7 @@ func (cli *AgilorCli) SubscribeDPoint(id int64, callback func(*dd.DdZeroMsg)) in
 func stub(msg *dd.DdZeroMsg) {
 	var cli *AgilorCli
 	cli.SubscribeDPoint(1, func(msg *dd.DdZeroMsg) {
-		cli.RxMsg <- msg
+		// cli.RxMsg <- msg
 	})
 }
 
