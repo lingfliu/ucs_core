@@ -5,18 +5,17 @@ import (
 	"os"
 	"os/signal"
 	"time"
-
-	"github.com/lingfliu/ucs_core/data/rtdb"
 )
 
 const HOST = "localhost:2366"
 
 func main() {
-	cli := rtdb.NewAgilorCli(HOST, "admin", "admin")
+	// cli := rtdb.NewAgilorCli(HOST, "admin", "admin")
 
-	sigRun, cancelRun := context.WithCancel(context.Background())
+	// sigRun, cancelRun := context.WithCancel(context.Background())
+	_, cancelRun := context.WithCancel(context.Background())
 
-	go _task_rtdb(sigRun, cli)
+	// go _task_rtdb(sigRun, cli)
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
@@ -31,6 +30,6 @@ func main() {
 	}
 }
 
-func _task_rtdb(sigRun context.Context, cli *rtdb.AgilorCli) {
-	cli.Open()
-}
+// func _task_rtdb(sigRun context.Context, cli *rtdb.AgilorCli) {
+// 	cli.Open()
+// }

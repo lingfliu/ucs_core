@@ -1,5 +1,13 @@
 package rtdb
 
+import "C"
+
+/*
+#include "include/agilor_wrapper.h"
+void * agilor_create(char* name);
+
+*/
+
 import (
 	"strconv"
 
@@ -37,7 +45,7 @@ type AgiPoint struct {
 	Descriptor   [32]byte      // 测点描述 #
 	Engunit      [16]byte      // 测点数据单位（安培、摄氏度等） #
 	Id           int32         // 测点编号，由系统配置
-	Class        uint8         // 菜单类型(R浮点数/S字符串/B开关/L整形/E枚举) *
+	Class        uint8         // 菜单类型(R浮点数/S字符串/B开关/L整形/E枚举) * //TODO: 这里缺了常量声明
 	Scan         uint8         // 测点扫描标识(0或>=0x80："禁止"， 1："输入", 2："输出" *
 	TypicalValue float32       // 典型值 # @unused
 	ValueUnion   AgiValueUnion // 点值 #
@@ -55,16 +63,11 @@ type AgiPoint struct {
 	PushRef1 uint16 // 实时推理规则标志 #
 	RuleRef1 uint16 // 实时推理规则标志 #
 
-	// Exception reporting
-	// Exception reporting ensures that a Agilor interface only sends meaningful
-	// data, rather than sending unnecessary data that taxes the system.
 	// 异常报告可确保Agilor接口只发送有意义的数据，而不是发送不必要的数据，从而加重系统的负担。
-
 	// Exception reporting uses a simple deadband algorithm to determine whether
 	// to send events to Agilor Data Archive. For each point, you can set
 	// exception reporting specifications that create the deadband. The interface
 	// ignores values that fall inside the deadband.
-	// 异常报告使用一个简单的死区算法来确定是否将事件发送到PI数据存档。对于每一点，可以设置创建死区的异常报告规范。该接口忽略死区内的值。
 	// TODO: exc_xxx这3个参数，只对接口有效，还是内核中也使用这3个参数？
 	ExcMin int64 // 实时数据处理最短间隔（接口参数）
 	ExcMax int64 // 实时数据处理最大间隔（内核参数）
@@ -75,6 +78,9 @@ type AgiPoint struct {
 	// 表示点值变化超过偏差。这时当点值变化超过偏差且与上次发送的点值时间戳之差>=exc_min
 	// 时，即使是过滤发生，也会将点值发送到内核。
 
+	/**************************************************/
+	//N.B. 关于报警部分这里全部不使用
+	/**************************************************/
 	AlarmType  uint16  // 报警类型
 	AlarmState uint16  // 状态报警
 	AlarmHi    float32 // 上限报警
@@ -87,6 +93,9 @@ type AgiPoint struct {
 	PriorityHiHi uint16
 	PriorityLoLo uint16
 
+	/**************************************************/
+	//存储部分设置
+	/**************************************************/
 	Archive  AgiBool // 是否存储历史数据
 	Compress AgiBool // 是否进行历史压缩 *，但type=O时，compress=agifalse
 	Step     uint8   // 历史数据的插值形式（线形，台阶），compress=agitrue时有效
@@ -137,6 +146,16 @@ type AgiDevicePoint struct {
 	State     int32
 	Value     AgiValueUnion // 联合体
 }
+
+// C 函数接口
+
+func AgiCreate(p *AgiDevicePoint) {
+	ret := C.agilor_create()
+	if ret < 0 {
+	}
+}
+
+// func (AgiCreate)
 
 /*************************************************/
 /* 缩写声明：DNode*可缩写为Dn*， DPoint可缩写为Dp* */
