@@ -6,17 +6,17 @@ import (
 )
 
 type DPoint struct {
-	Ts     int64
-	Idx    int   //序号
-	Id     int64 //dpoint id
-	NodeId int64 //dnode id
-	Name   string
-	Offset int //index offset
-	/*
-	 * data could be values (data array) or url (files)
-	 */
-	Data []byte
-	Meta *meta.DataMeta
+	//1. 寻址， 2. 静态属性， 3. 数据格式， 4. 数据
+	Id       int64
+	NodeId   int64
+	NodeAddr string
+	Offset   int
+	Name     string //数据点位名称
+	Ts       int64
+	Idx      int //序号
+	// data could be values (data array) or url (files)
+	DataMeta *meta.DataMeta
+	Data     []byte
 }
 
 // TODO: 基于byte、meta、id的装配
@@ -29,12 +29,12 @@ func NewDPoint(id int64, nodeId int64, offset int, ts int64, idx int, dataMeta *
 		return nil
 	} else {
 		return &DPoint{
-			Id:     id,
-			NodeId: nodeId,
-			Offset: offset,
-			Meta:   dataMeta,
-			Data:   data,
-			Ts:     0,
+			Id:       id,
+			NodeId:   nodeId,
+			Offset:   offset,
+			DataMeta: dataMeta,
+			Data:     data,
+			Ts:       0,
 		}
 	}
 }

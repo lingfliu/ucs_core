@@ -3,7 +3,8 @@
 
 #ifdef __cplusplus
 extern "C" {
-    #endif
+#endif
+
     void* agilor_create(const char* name);
     void agilor_destroy(void* p);
     void agilor_set(void* p, const char* name, const char* value);
@@ -14,4 +15,5 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
 #endif // _AGILOR_WRAPPER_C_H_

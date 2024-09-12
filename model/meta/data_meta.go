@@ -3,24 +3,22 @@ package meta
 import "encoding/binary"
 
 const (
-	DATA_CLASS_RAW   = 0 //in bytes
+	DATA_CLASS_RAW   = 0 //in bytes (string)
 	DATA_CLASS_INT   = 1
 	DATA_CLASS_UINT  = 2
 	DATA_CLASS_FLOAT = 3
 	DATA_CLASS_FLAG  = 4
-	DATA_CLASS_JSON  = 5 //UTF-8 supported json string
+	DATA_CLASS_JSON  = 5 //UTF-8 format json string
 )
 
 /**
  * Normally, a data meta declare a single data specification
  */
 type DataMeta struct {
-	ByteLen   int //1,2,4,8 for values
+	ByteLen   int //1,2,4,8 only
 	Dimen     int
 	Alias     string //代号
 	Unit      string //单位
-	DnClass   int    //节点类型
-	DpClass   int    //类型
 	DataClass int
 	Msb       bool
 }

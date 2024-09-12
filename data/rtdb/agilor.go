@@ -3,15 +3,13 @@ package rtdb
 /*
 #cgo CFLAGS: -I./lib_agilor/include
 #cgo LDFLAGS: -L./lib_agilor -lagilor -Wl,-rpath=./lib_agilor
-#include "./lib_agilor/include/agilor_wrapper_c.h"
+#include "./lib_agilor/src/agilor_wrap.h"
 void* agilor_create(const char* name);
 */
 import "C"
 
 import (
-	"fmt"
 	"strconv"
-	"unsafe"
 
 	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/model"
@@ -154,17 +152,17 @@ type AgiDevicePoint struct {
 
 func AgiCreate(p *AgiDevicePoint) {
 
-	namePtr := C.CString(string(p.SourceTag[:]))
+	// namePtr := C.CString(string(p.SourceTag[:]))
 
-	// fmt.Println(namePtr)
+	// // fmt.Println(namePtr)
 
-	ptr := unsafe.Pointer(C.agilor_create(namePtr))
+	// ptr := unsafe.Pointer(C.agilor_create(namePtr))
 
-	fmt.Println(ptr)
+	// fmt.Println(ptr)
 
-	if ptr == nil {
-		ulog.Log().E("agilor", "create failed")
-	}
+	// if ptr == nil {
+	// 	ulog.Log().E("agilor", "create failed")
+	// }
 }
 
 // func (AgiCreate)
@@ -196,12 +194,12 @@ type AgilorDPoint struct {
 func DPoint2AgilorDPoint(p *model.DPoint) *AgilorDPoint {
 	return &AgilorDPoint{
 		Id:       string(p.Id),
-		Name:     p.Meta.Alias,
+		Name:     p.DataMeta.Alias,
 		DeviceId: string(p.NodeId),
-		Type:     p.Meta.DataClass,
+		Type:     p.DataMeta.DataClass,
 		Data:     p.Data,
 		Ts:       p.Ts,
-		Unit:     p.Meta.Unit,
+		Unit:     p.DataMeta.Unit,
 	}
 }
 
@@ -222,11 +220,11 @@ func AgilorDPoint2DPoint(ap *AgilorDPoint, meta *meta.DataMeta) *model.DPoint {
 	}
 
 	return &model.DPoint{
-		Id:     id,
-		NodeId: parentId,
-		Ts:     ap.Ts,
-		Data:   ap.Data,
-		Meta:   meta,
+		Id:       id,
+		NodeId:   parentId,
+		Ts:       ap.Ts,
+		Data:     ap.Data,
+		DataMeta: meta,
 	}
 }
 

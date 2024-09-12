@@ -1,4 +1,4 @@
-package spec
+package model
 
 const (
 	CAM_CLASS_BOLT      = 0 //球机
