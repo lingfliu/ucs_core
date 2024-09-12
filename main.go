@@ -112,14 +112,14 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDao *dao.DpD
 			switch rxmsg.Topic {
 			case "ucs/dd/dp":
 				//payload is encoded by DpCoder: [ts, dnode id, dp offsetidx, int value]
-				dpMsg := &msg.DpMsg{}
+				dpMsg := &msg.DMsg{}
 				err := json.Unmarshal(rxmsg.Data, dpMsg)
 				if err != nil {
 					ulog.Log().E("main", "dp msg decode error: "+err.Error())
 				} else {
 					//insert into taos
 					ulog.Log().I("main", "insert dp msg: "+string(rxmsg.Data))
-					dpDao.Insert(dpMsg)
+					dpDao.Insert(dMsg)
 				}
 
 			}

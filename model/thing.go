@@ -46,7 +46,7 @@ type Thing struct {
 	Online  bool //在线状态
 	ErrCode int  //是否正常工作
 
-	PropSet map[string]*NodeProp //静态属性
+	PropSet map[string]string    //静态属性
 	DpSet   map[string]*DPoint   //数据/状态列表
 	CpSet   map[string]*CtlPoint //控制列表
 }

@@ -2,9 +2,21 @@ package meta
 
 import "encoding/binary"
 
+const (
+	DATA_CLASS_RAW   = 0 //in bytes
+	DATA_CLASS_INT   = 1
+	DATA_CLASS_UINT  = 2
+	DATA_CLASS_FLOAT = 3
+	DATA_CLASS_FLAG  = 4
+	DATA_CLASS_JSON  = 5 //UTF-8 supported json string
+)
+
+/**
+ * Normally, a data meta declare a single data specification
+ */
 type DataMeta struct {
+	ByteLen   int //1,2,4,8 for values
 	Dimen     int
-	ByteLen   int    //1,2,4,8 only
 	Alias     string //代号
 	Unit      string //单位
 	DnClass   int    //节点类型
@@ -13,14 +25,15 @@ type DataMeta struct {
 	Msb       bool
 }
 
+//TODO: remove on release
 func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any {
 	data := make([]any, dimen)
 	switch class {
-	case VAL_CLASS_RAW:
+	case DATA_CLASS_RAW:
 		for i, val := range raw {
 			data[i] = val
 		}
-	case VAL_CLASS_INT:
+	case DATA_CLASS_INT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//int32
@@ -32,7 +45,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case VAL_CLASS_UINT:
+	case DATA_CLASS_UINT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//int32
@@ -44,7 +57,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case VAL_CLASS_FLOAT:
+	case DATA_CLASS_FLOAT:
 		for i := 0; i < dimen; i++ {
 			if byteLen == 4 {
 				//float32
@@ -56,7 +69,7 @@ func DataConvert(raw []byte, class int, byteLen int, dimen int, msb bool) []any 
 				panic("unsupported byte length")
 			}
 		}
-	case VAL_CLASS_FLAG:
+	case DATA_CLASS_FLAG:
 		for i := 0; i < dimen; i++ {
 			data[i] = raw[i] != 0
 		}

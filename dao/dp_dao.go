@@ -40,8 +40,8 @@ func (dao *DpDao) Close() {
 }
 
 // TODO: 需要实现泛化，否则需要硬编码逐个数据结构进行实现
-func (dao *DpDao) Insert(msg *msg.DpMsg) {
-	for idx, v := range msg.Data {
+func (dao *DpDao) Insert(msg *msg.DMsg) {
+	for idx, v := range msg.DataSet {
 		tableName := fmt.Sprintf("dp_%d_%d", msg.DNodeId, idx)
 		sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values (?, ?)", tableName)
 		dao.taosCli.Exec(sql, msg.Class, msg.DNodeId, idx, msg.Ts, v)

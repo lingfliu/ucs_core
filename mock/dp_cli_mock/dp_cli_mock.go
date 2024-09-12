@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/lingfliu/ucs_core/coder"
 	"github.com/lingfliu/ucs_core/dd"
+	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
 )
@@ -76,6 +76,7 @@ func _task_cancel(ctlRunList []context.CancelFunc) {
 	}
 	ulog.Log().I("mock", "all tasks canceled")
 }
+
 func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 	dnode.Cli.Start()
 	tic := time.NewTicker(100 * time.Millisecond)
@@ -84,18 +85,18 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 		case <-sigRun.Done():
 			dnode.Cli.Stop()
 		case <-tic.C:
-			valueList := make([]int64, 0)
+			valueList := make([]byte, 0)
 			for i := 0; i < dnode.DpDimen; i++ {
 				//random int64
 				v := utils.RandInt64(0, 10000)
-				valueList = append(valueList, int64(v))
+				valueList = append(valueList, byte(v))
 			}
-			ddMsg := &coder.DpMsg{
-				Ts:         time.Now().UnixNano() / 1e6, //in milliseconds
-				DNodeClass: dnode.Class,
-				DNodeId:    dnode.Id,
+			ddMsg := &msg.DMsg{
+				Ts:      time.Now().UnixNano() / 1e6, //in milliseconds
+				Class:   0,
+				DNodeId: dnode.Id,
 				//random int64
-				ValueList: valueList,
+				DataSet: make(map[int]*msg.DMsgDpData),
 			}
 			bytes, err := json.Marshal(ddMsg)
 			if err != nil {
