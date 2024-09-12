@@ -1,4 +1,4 @@
-package model
+package meta
 
 const (
 	VAL_CLASS_RAW   = 0 //in bytes

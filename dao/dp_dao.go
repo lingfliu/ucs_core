@@ -3,8 +3,8 @@ package dao
 import (
 	"fmt"
 
-	"github.com/lingfliu/ucs_core/coder"
 	"github.com/lingfliu/ucs_core/data/rtdb"
+	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
@@ -39,10 +39,11 @@ func (dao *DpDao) Close() {
 	dao.taosCli.Close()
 }
 
-func (dao *DpDao) Insert(msg *coder.DpMsg) {
-	for idx, v := range msg.ValueList {
+// TODO: 需要实现泛化，否则需要硬编码逐个数据结构进行实现
+func (dao *DpDao) Insert(msg *msg.DpMsg) {
+	for idx, v := range msg.Data {
 		tableName := fmt.Sprintf("dp_%d_%d", msg.DNodeId, idx)
 		sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values (?, ?)", tableName)
-		dao.taosCli.Exec(sql, msg.DNodeClass, msg.DNodeId, idx, msg.Ts, v)
+		dao.taosCli.Exec(sql, msg.Class, msg.DNodeId, idx, msg.Ts, v)
 	}
 }

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
@@ -8,11 +9,11 @@ type DPoint struct {
 	Ts       int64
 	Id       int64 //dpoint id
 	ParentId int64 //dnode id
-	Data     []any
-	Meta     *DataMeta
+	Data     []byte
+	Meta     *meta.DataMeta
 }
 
-func NewDPoint(id, parentId int64, meta *DataMeta, raw_data []byte) *DPoint {
+func NewDPoint(id, parentId int64, meta *meta.DataMeta, raw_data []byte) *DPoint {
 	byteLen := meta.ByteLen
 	dimen := meta.Dimen
 
@@ -20,12 +21,11 @@ func NewDPoint(id, parentId int64, meta *DataMeta, raw_data []byte) *DPoint {
 		ulog.Log().E("model", "byte length not match")
 		return nil
 	} else {
-		data := DataConvert(raw_data, meta.DataClass, meta.ByteLen, meta.Dimen, meta.Msb)
 		return &DPoint{
 			Id:       id,
 			ParentId: parentId,
 			Meta:     meta,
-			Data:     data,
+			Data:     raw_data,
 			Ts:       0,
 		}
 	}

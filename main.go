@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/lingfliu/ucs_core/coder"
 	"github.com/lingfliu/ucs_core/dao"
 	"github.com/lingfliu/ucs_core/dd"
+	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
 )
@@ -107,18 +107,18 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDao *dao.DpD
 		select {
 		case <-sigRun.Done():
 			return
-		case msg := <-mqttCli.RxMsg:
+		case rxmsg := <-mqttCli.RxMsg:
 			//parse mqtt message
-			switch msg.Topic {
+			switch rxmsg.Topic {
 			case "ucs/dd/dp":
 				//payload is encoded by DpCoder: [ts, dnode id, dp offsetidx, int value]
-				dpMsg := &coder.DpMsg{}
-				err := json.Unmarshal(msg.Data, dpMsg)
+				dpMsg := &msg.DpMsg{}
+				err := json.Unmarshal(rxmsg.Data, dpMsg)
 				if err != nil {
 					ulog.Log().E("main", "dp msg decode error: "+err.Error())
 				} else {
 					//insert into taos
-					ulog.Log().I("main", "insert dp msg: "+string(msg.Data))
+					ulog.Log().I("main", "insert dp msg: "+string(rxmsg.Data))
 					dpDao.Insert(dpMsg)
 				}
 

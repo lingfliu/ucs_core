@@ -1,14 +1,14 @@
-package model
+package meta
 
 import "encoding/binary"
 
 type DataMeta struct {
 	Dimen     int
-	ByteLen   int
+	ByteLen   int    //1,2,4,8 only
 	Alias     string //代号
-	Unit      string
-	DpClass   int
-	DnClass   int
+	Unit      string //单位
+	DnClass   int    //节点类型
+	DpClass   int    //类型
 	DataClass int
 	Msb       bool
 }
