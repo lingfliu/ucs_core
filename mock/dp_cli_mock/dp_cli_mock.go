@@ -96,7 +96,7 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 				Class:   0,
 				DNodeId: dnode.Id,
 				//random int64
-				DataSet: make(map[int]*msg.DMsgDpData),
+				DataSet: make(map[int]*msg.DData),
 			}
 			bytes, err := json.Marshal(ddMsg)
 			if err != nil {

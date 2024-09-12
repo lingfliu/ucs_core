@@ -1,18 +1,21 @@
 package rtdb
 
+/*
+#cgo CFLAGS: -I./lib_agilor/include
+#cgo LDFLAGS: -L./lib_agilor -lagilor -Wl,-rpath=./lib_agilor
+#include "./lib_agilor/include/agilor_wrapper_c.h"
+void* agilor_create(const char* name);
+*/
 import "C"
 
-/*
-#include "include/agilor_wrapper.h"
-void * agilor_create(char* name);
-
-*/
-
 import (
+	"fmt"
 	"strconv"
+	"unsafe"
 
 	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
@@ -150,8 +153,17 @@ type AgiDevicePoint struct {
 // C 函数接口
 
 func AgiCreate(p *AgiDevicePoint) {
-	ret := C.agilor_create()
-	if ret < 0 {
+
+	namePtr := C.CString(string(p.SourceTag[:]))
+
+	// fmt.Println(namePtr)
+
+	ptr := unsafe.Pointer(C.agilor_create(namePtr))
+
+	fmt.Println(ptr)
+
+	if ptr == nil {
+		ulog.Log().E("agilor", "create failed")
 	}
 }
 
@@ -176,7 +188,7 @@ type AgilorDPoint struct {
 	Name     string
 	DeviceId string
 	Type     int
-	Data     []any
+	Data     []byte
 	Ts       int64
 	Unit     string
 }
@@ -185,7 +197,7 @@ func DPoint2AgilorDPoint(p *model.DPoint) *AgilorDPoint {
 	return &AgilorDPoint{
 		Id:       string(p.Id),
 		Name:     p.Meta.Alias,
-		DeviceId: string(p.ParentId),
+		DeviceId: string(p.NodeId),
 		Type:     p.Meta.DataClass,
 		Data:     p.Data,
 		Ts:       p.Ts,
@@ -193,7 +205,7 @@ func DPoint2AgilorDPoint(p *model.DPoint) *AgilorDPoint {
 	}
 }
 
-func AgilorDPoint2DPoint(ap *AgilorDPoint, meta *model.DataMeta) *model.DPoint {
+func AgilorDPoint2DPoint(ap *AgilorDPoint, meta *meta.DataMeta) *model.DPoint {
 	var err error
 	var id int64
 	id, err = strconv.ParseInt(ap.Id, 10, 64)
@@ -210,11 +222,11 @@ func AgilorDPoint2DPoint(ap *AgilorDPoint, meta *model.DataMeta) *model.DPoint {
 	}
 
 	return &model.DPoint{
-		Id:       id,
-		ParentId: parentId,
-		Ts:       ap.Ts,
-		Data:     ap.Data,
-		Meta:     meta,
+		Id:     id,
+		NodeId: parentId,
+		Ts:     ap.Ts,
+		Data:   ap.Data,
+		Meta:   meta,
 	}
 }
 
@@ -263,7 +275,7 @@ func (cli *AgilorCli) Insert(p *model.DPoint) {
 /**
  * class, dnodeId, dpointId < 0 为无效参数
  */
-func (cli *AgilorCli) Query(tic int64, toc int64, class int, dnodeId int64, dpointId int64, meta *model.DataMeta) []*model.DPoint {
+func (cli *AgilorCli) Query(tic int64, toc int64, class int, dnodeId int64, dpointId int64, meta *meta.DataMeta) []*model.DPoint {
 	dpList := make([]*model.DPoint, 0)
 	//TODO: 这里将查询到的AgilorDPoint转换为DPoint
 	dp := &model.DPoint{

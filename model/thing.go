@@ -31,11 +31,11 @@ type Thing struct {
 	Descrip  string //描述(型号，设备商)
 
 	//连接属性 (直连、网关)
-	ConnCfg   *conn.ConnCfg
-	Conn      *conn.Conn
-	Addr      string  //ip or url
-	Gw        *GwNode //nil if direct connect to the server
-	OffsetIdx int     //偏置地址索引
+	ConnCfg *conn.ConnCfg
+	Conn    *conn.Conn
+	Addr    string //ip or url
+	Gw      *Gw    //nil if direct connect to the server
+	Offset  int    //偏置地址索引
 
 	//位置
 	GPos *gis.GPos

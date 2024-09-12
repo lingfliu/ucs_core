@@ -119,7 +119,7 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDao *dao.DpD
 				} else {
 					//insert into taos
 					ulog.Log().I("main", "insert dp msg: "+string(rxmsg.Data))
-					dpDao.Insert(dMsg)
+					dpDao.Insert(dpMsg)
 				}
 
 			}
