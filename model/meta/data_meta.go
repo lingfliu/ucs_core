@@ -12,7 +12,7 @@ const (
 )
 
 /**
- * Normally, a data meta declare a single data specification
+ * Normally, a data meta declares a single data specification
  */
 type DataMeta struct {
 	ByteLen   int //1,2,4,8 only

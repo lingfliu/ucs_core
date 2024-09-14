@@ -15,4 +15,5 @@ type Cam struct {
 	StreamAddr  string //流地址
 	StreamProto string //流协议
 	Resolution  string //分辨率
+	State       int    //状态 0-正常， 2-故障， 3-离线
 }

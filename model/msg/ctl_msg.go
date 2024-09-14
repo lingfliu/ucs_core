@@ -28,6 +28,9 @@ type CtlMsg struct {
 	CtlCmd      *CtlCmd
 }
 
+/**
+ * 控制点位消息转换
+ */
 func CtlPoint2Msg(cp *model.CtlPoint) *CtlMsg {
 	return &CtlMsg{
 		Ts:          cp.Ts,
@@ -42,6 +45,7 @@ func CtlPoint2Msg(cp *model.CtlPoint) *CtlMsg {
 	}
 }
 
+//TODO: remove it
 func CtlMsg2Point(cm *CtlMsg, cp *model.CtlPoint) {
 	if cp.NodeId == cm.CtlNodeId && cp.NodeAddr == cm.CtlNodeAddr && cp.Offset == cm.CtlCmd.Offset {
 		cp.Ts = cm.Ts

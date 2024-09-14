@@ -4,6 +4,7 @@ import "github.com/lingfliu/ucs_core/conn"
 
 /**
  * 网关节点，一般情况下仅用于进行数据转发
+ * (not used)
  */
 type Gw struct {
 	Id         string
