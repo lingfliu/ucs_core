@@ -4,7 +4,8 @@ package model
  * 大型工程设备
  */
 const (
-	MACH_CLASS_WSP = 0 //湿喷机
+	MACH_CLASS_WSP         = 0 //湿喷机
+	MACH_CLASS_SIMPLE_VEHI = 0 //湿喷机
 )
 
 type Mach struct {

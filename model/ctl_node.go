@@ -11,7 +11,8 @@ type CtlNode struct {
 	ParentId  int64
 	Addr      string
 	Name      string
-	Class     int // 0-IO模式，1-Function模式
+	Class     string
+	Mode      int // 0-IO模式，1-Function模式
 	Desc      string
 	PropSet   map[string]string //静态属性集
 	CtlPoints map[int64]*CtlPoint

@@ -18,8 +18,9 @@ type DNode struct {
 	Id        int64
 	ParentId  int64             //归属
 	Name      string            //名称
-	Class     int               //节点设备类型编码
-	Mode      int               //监测模式
+	Class     string            //节点设备类型编码
+	Mode      int               //监测模式: 0-采样，1-事件触发，2-轮询
+	Sps       int64             //采样率, 仅在采样模式下有效
 	Addr      string            //ip or url
 	Desc      string            //文字描述，辅助信息
 	PropSet   map[string]string //静态属性，string格式
