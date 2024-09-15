@@ -14,13 +14,13 @@ const (
 	CONN_STATE_CLOSED       = 3
 	CONN_STATE_LISTENING    = 4
 
-	CONN_CLASS_TCP    string = "tcp"
-	CONN_CLASS_UDP    string = "udp"
-	CONN_CLASS_QUIC   string = "quic"
-	CONN_CLASS_MQTT   string = "mqtt"
-	CONN_CLASS_MODBUS string = "modbus"
-	CONN_CLASS_HTTP   string = "http"
-	CONN_CLASS_RTSP   string = "rtsp"
+	CONN_CLASS_TCP   string = "tcp"
+	CONN_CLASS_UDP   string = "udp"
+	CONN_CLASS_QUIC  string = "quic"
+	CONN_CLASS_MQTT  string = "mqtt"
+	CONN_CLASS_OPCUA string = "opcua"
+	CONN_CLASS_HTTP  string = "http"
+	CONN_CLASS_RTSP  string = "rtsp"
 	// CONN_CLASS_kcp string = "kcp" //TODO: implement kcp
 )
 
