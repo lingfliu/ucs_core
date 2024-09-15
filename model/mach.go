@@ -5,7 +5,7 @@ package model
  */
 const (
 	MACH_CLASS_WSP         = 0 //湿喷机
-	MACH_CLASS_SIMPLE_VEHI = 0 //湿喷机
+	MACH_CLASS_SIMPLE_VEHI = 1 //简易车辆
 )
 
 type Mach struct {

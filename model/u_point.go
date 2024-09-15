@@ -1,6 +1,8 @@
 package model
 
-import "github.com/lingfliu/ucs_core/model/meta"
+import (
+	"github.com/lingfliu/ucs_core/model/meta"
+)
 
 type UPoint struct {
 	Id       int64
