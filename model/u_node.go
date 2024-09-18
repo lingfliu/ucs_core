@@ -29,13 +29,13 @@ type UNode struct {
 	ParentId int64
 	Mac      string            //可选
 	Name     string            //名称
-	Desc     string            //概要描述(型号，设备商)
+	Class    string            //类型
+	Descrip  string            //概要描述(型号，设备商等)
 	PropSet  map[string]string //静态属性
 
 	//连接属性
+	Addr    string        //url地址
 	ConnCfg *conn.ConnCfg //连接配置
-	Addr    string        //ip or url
-	Url     string        //网关连接模式下，该值为内部地址
 
 	//位置，速度信息，当节点为装备、人员时为实时位置信息，否则为装配位置配置信息（静态）
 	GPos *gis.GPos
@@ -46,6 +46,6 @@ type UNode struct {
 	Online  bool //在线状态
 	ErrCode int  //错误码
 
-	NodeSet  map[string]*UNode  //子节点
+	Children map[string]*UNode  //子节点, id as the key
 	PointSet map[string]*UPoint //数据点位
 }

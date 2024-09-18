@@ -9,11 +9,11 @@ package model
 type CtlNode struct {
 	Id        int64
 	ParentId  int64
-	Addr      string
+	Addr      string //url
 	Name      string
 	Class     string
 	Mode      int // 0-IO模式，1-Function模式
-	Desc      string
+	Descrip   string
 	PropSet   map[string]string //静态属性集
 	CtlPoints map[int64]*CtlPoint
 	State     int //状态 0-正常， 2-故障， 3-离线

@@ -11,6 +11,7 @@ type DPoint struct {
 	NodeAddr string
 	Offset   int
 	Name     string //数据点位名称
+	Sps      int64  //采样率, 仅在采样模式下有效
 	Ts       int64
 	Idx      int //序号
 	// data could be values (data array) or url (files)

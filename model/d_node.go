@@ -17,14 +17,13 @@ const (
 type DNode struct {
 	Id        int64
 	ParentId  int64             //归属
+	Addr      string            //url
 	Name      string            //名称
 	Class     string            //节点设备类型编码
 	Mode      int               //监测模式: 0-采样，1-事件触发，2-轮询
-	Sps       int64             //采样率, 仅在采样模式下有效
-	Addr      string            //ip or url
-	Desc      string            //文字描述，辅助信息
+	Descrip   string            //文字描述，辅助信息
 	PropSet   map[string]string //静态属性，string格式
 	DPointSet map[int64]*DPoint //数据点位
 	State     int               //0-正常，1-告警，2-故障, 3-离线
-	//TODO: 是否需要添加多个状态实时数据
+	//其他的state定义为若干个DPoint
 }
