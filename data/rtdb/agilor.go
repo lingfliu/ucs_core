@@ -291,8 +291,8 @@ func (cli *AgilorCli) DeleteDPoint(pointId int64) {
  * 创建设备节点对应的点位
  */
 func (cli *AgilorCli) CreateDNode(node *model.DNode) {
-	for _, p := node.DPointSet {
-		cli.CreateDPoint(p) 
+	for _, p := range node.DPointSet {
+		cli.CreateDPoint(p)
 	}
 }
 
@@ -308,8 +308,9 @@ func (cli *AgilorCli) DeleteDNode(nodeId int64) {
  */
 func (cli *AgilorCli) QueryDNode(id int64) []*model.DNode {
 	//TODO:
-	return {&model.DNode{}}
+	return make([]*model.DNode, 0)
 }
+
 /**
  * 插入数据
  */
@@ -319,9 +320,9 @@ func (cli *AgilorCli) Insert(p *model.DPoint) {
 	// cli.c_cli.insert(ap) //TODO: 这里调用C接口
 
 	for i := 0; i < p.DataMeta.Dimen; i++ {
-		tag := p.NodeId + "-" + p.DPointId + "-" + strconv.Itoa(i)
 		//TODO: 调用C接口插入一个数据
-		//AgiInsert(tag, p.Data[i], p.Ts)
+		// tag := fmt.Sprintf("%d-%d-%d", p.NodeId, p.Id, i)
+		// AgiInsert(tag, p.Data[i], p.Ts)
 	}
 }
 
@@ -339,8 +340,8 @@ func (cli *AgilorCli) QueryDPoint(tic int64, toc int64, dpointId int64, meta *me
  * 查询指定节点所有的数据快照
  */
 func (cli *AgilorCli) QueryDNodeNow(id int64, class int) []*model.DPoint {
-	//TODO: 调用query与转换接口 
-	return {&model.DPoint{}}
+	//TODO: 调用query与转换接口
+	return make([]*model.DPoint, 0)
 }
 
 /**
@@ -348,7 +349,8 @@ func (cli *AgilorCli) QueryDNodeNow(id int64, class int) []*model.DPoint {
  */
 func (cli *AgilorCli) QueryDPointNow(id int64, class int) []*model.DPoint {
 	//TODO: 调用query与转化接口
-	return &model.DPoint{}
+	points := make([]*model.DPoint, 0)
+	return points
 }
 
 /**
@@ -382,13 +384,14 @@ func (cli *AgilorCli) AggregateQuery(tic int64, toc int64, window int64, step in
 func (cli *AgilorCli) Delete(tic int64, toc int64, dNodeId int64, dPointId int64) {
 }
 
-/**
- * 删除节点(类型）以及其下所有的数据点位数据
- * 不单独删除数据点位因为点位和节点是强绑定关系
- @param dNodeId: 节点id
- @param dNodeClass: 节点类型
- 以上两个参数至少需要一个有效
- */
+/*
+*
+* 删除节点(类型）以及其下所有的数据点位数据
+* 不单独删除数据点位因为点位和节点是强绑定关系
+@param dNodeId: 节点id
+@param dNodeClass: 节点类型
+以上两个参数至少需要一个有效
+*/
 func (cli *AgilorCli) DropDNode(dNodeId int64, dNodeClass int) {
 	//TODO: 调用接口删除
 }
