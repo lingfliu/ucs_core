@@ -20,7 +20,7 @@ func NewTehuNode(id int64, name string, addr string) *model.DNode {
 		Id:        id,
 		Name:      name,
 		Addr:      addr,
-		Desc:      "温湿度传感器",
+		Descrip:   "温湿度传感器",
 		PropSet:   make(map[string]string),
 		DPointSet: make(map[int64]*model.DPoint),
 		State:     model.DNODE_STATE_OK,

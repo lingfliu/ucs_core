@@ -22,6 +22,7 @@ type DNode struct {
 	Class     string            //节点设备类型编码
 	Mode      int               //监测模式: 0-采样，1-事件触发，2-轮询
 	Descrip   string            //文字描述，辅助信息
+	Sps       int64             //采样频率
 	PropSet   map[string]string //静态属性，string格式
 	DPointSet map[int64]*DPoint //数据点位
 	State     int               //0-正常，1-告警，2-故障, 3-离线

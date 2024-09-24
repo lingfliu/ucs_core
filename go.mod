@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/quic-go/quic-go v0.45.1
-	github.com/taosdata/driver-go/v3 v3.5.6
+	github.com/taosdata/driver-go/v3 v3.5.7
 	gorm.io/driver/mysql v1.5.7
 	gorm.io/gorm v1.25.11
 )

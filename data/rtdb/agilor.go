@@ -258,49 +258,105 @@ func NewAgilorCli(host string, username string, password string) *AgilorCli {
 	}
 }
 
+/**
+ * 连接数据库
+ */
 func (cli *AgilorCli) Open() {
 }
 
+/**
+ * 关闭数据库
+ */
 func (cli *AgilorCli) Close() {
 }
 
+/**
+ * 拆分创建数据点位
+ */
+func (cli *AgilorCli) CreateDPoint(p *model.DPoint) {
+	for i := 0; i < p.DataMeta.Dimen; i++ {
+		//TODO: 创建nodeId-dpointId-i标签的
+		//createAgiPoint()
+	}
+}
+
+/**
+ * 删除数据点位
+ */
+func (cli *AgilorCli) DeleteDPoint(pointId int64) {
+	//TODO: 调用maskTag接口找到对应的表并删除
+}
+
+/**
+ * 创建设备节点对应的点位
+ */
+func (cli *AgilorCli) CreateDNode(node *model.DNode) {
+	for _, p := node.DPointSet {
+		cli.CreateDPoint(p) 
+	}
+}
+
+/**
+ * 删除设备节点
+ */
+func (cli *AgilorCli) DeleteDNode(nodeId int64) {
+	//TODO: 调用maskTag接口找到对应的表并删除
+}
+
+/**
+ * 查询数据节点, id=0查询所有
+ */
+func (cli *AgilorCli) QueryDNode(id int64) []*model.DNode {
+	//TODO:
+	return {&model.DNode{}}
+}
+/**
+ * 插入数据
+ */
 func (cli *AgilorCli) Insert(p *model.DPoint) {
 	//转换为AgilorDPoint
 	// ap := DPoint2AgilorDPoint(p)
 	// cli.c_cli.insert(ap) //TODO: 这里调用C接口
+
+	for i := 0; i < p.DataMeta.Dimen; i++ {
+		tag := p.NodeId + "-" + p.DPointId + "-" + strconv.Itoa(i)
+		//TODO: 调用C接口插入一个数据
+		//AgiInsert(tag, p.Data[i], p.Ts)
+	}
 }
 
 /**
- * class, dnodeId, dpointId < 0 为无效参数
+ * 查询单个历史点位数据
+ * class, dpointId < 0 为无效参数
  */
-func (cli *AgilorCli) Query(tic int64, toc int64, class int, dnodeId int64, dpointId int64, meta *meta.DataMeta) []*model.DPoint {
+func (cli *AgilorCli) QueryDPoint(tic int64, toc int64, dpointId int64, meta *meta.DataMeta) []*model.DPoint {
 	dpList := make([]*model.DPoint, 0)
 	//TODO: 这里将查询到的AgilorDPoint转换为DPoint
-	dp := &model.DPoint{
-		Ts: 0,
-	}
-	dpList = append(dpList, dp)
 	return dpList
 }
 
-func (cli *AgilorCli) QueryDNodeNow(id int64) *model.DPoint {
-	return &model.DPoint{}
+/**
+ * 查询指定节点所有的数据快照
+ */
+func (cli *AgilorCli) QueryDNodeNow(id int64, class int) []*model.DPoint {
+	//TODO: 调用query与转换接口 
+	return {&model.DPoint{}}
 }
 
-func (cli *AgilorCli) QueryDPointNow(id int64) *model.DPoint {
+/**
+ * 查询指定数据点位（类型）数据快照
+ */
+func (cli *AgilorCli) QueryDPointNow(id int64, class int) []*model.DPoint {
+	//TODO: 调用query与转化接口
 	return &model.DPoint{}
-}
-
-func (cli *AgilorCli) QueryDPointClassNow(class int) []*model.DPoint {
-	return make([]*model.DPoint, 0)
 }
 
 /**
  * query aggregated data points
- * @param tic: start timestamp in us
+ * @param tic: start timestamp in ns
  * @param toc: end timestamp in us
- * @param window: the window size model
- * @param step: the step size in us
+ * @param window: the window size in ns
+ * @param step: the step size in ns
  * @param class: the class of data points
  */
 func (cli *AgilorCli) AggregateQuery(tic int64, toc int64, window int64, step int64, class int, op int) []model.DPoint {
@@ -319,44 +375,22 @@ func (cli *AgilorCli) AggregateQuery(tic int64, toc int64, window int64, step in
 
 /**
  * 删除数据
- * @param class: 数据点位类型
- * @param tic: 开始时间
+ * @param tic: 开始时间 //TODO: 一般设置为0，优先实现删除toc时间之前所有历史数据
  * @param toc: 结束时间
- * class, dNodeId, dPointId 至少需要一个有效参数
+ * dNodeId, dPointId 至少需要一个有效参数
  */
-func (cli *AgilorCli) Delete(tic int64, toc int64, class int, dNodeId int64, dPointId int64) {
-}
-
-func (cli *AgilorCli) DropDNode(dNodeId int64) {
-}
-
-func (cli *AgilorCli) DropDPoint(dPointId int64) {
+func (cli *AgilorCli) Delete(tic int64, toc int64, dNodeId int64, dPointId int64) {
 }
 
 /**
- * 删除一类数据节点
+ * 删除节点(类型）以及其下所有的数据点位数据
+ * 不单独删除数据点位因为点位和节点是强绑定关系
+ @param dNodeId: 节点id
+ @param dNodeClass: 节点类型
+ 以上两个参数至少需要一个有效
  */
-func (cli *AgilorCli) DropDNodeClass(dNodeClass int) {
-}
-
-/**
- * 删除指定一类数据点位
- */
-func (cli *AgilorCli) DropDPointClass(dPointClass int) {
-
-}
-
-/**
- * 初始化调用，创建表
- */
-func (cli *AgilorCli) CreateTable() {
-}
-
-/**
- * 运维用，删除表
- */
-func (cli *AgilorCli) DropTable(name string) {
-
+func (cli *AgilorCli) DropDNode(dNodeId int64, dNodeClass int) {
+	//TODO: 调用接口删除
 }
 
 /****************************************************/
@@ -366,20 +400,8 @@ func (cli *AgilorCli) SubscribeDPoint(id int64, callback func(*dd.DdZeroMsg)) in
 	return 0
 }
 
-func stub(msg *dd.DdZeroMsg) {
-	var cli *AgilorCli
-	cli.SubscribeDPoint(1, func(msg *dd.DdZeroMsg) {
-		// cli.RxMsg <- msg
-	})
-}
-
 func (cli *AgilorCli) UnsubscribeDPoint(dPointId int64) int {
 	return 0
-}
-
-func (cli *AgilorCli) SubscribeDpClass(class int) []int64 {
-	//TODO: replace with dnode id
-	return make([]int64, 0)
 }
 
 func (cli *AgilorCli) SubscribeDNode(dNodeId int64) int {
