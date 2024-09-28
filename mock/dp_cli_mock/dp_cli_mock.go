@@ -93,7 +93,7 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 			}
 			ddMsg := &msg.DMsg{
 				Ts:      time.Now().UnixNano() / 1e6, //in milliseconds
-				Class:   0,
+				Mode:    0,
 				DNodeId: dnode.Id,
 				//random int64
 				DataSet: make(map[int]*msg.DData),

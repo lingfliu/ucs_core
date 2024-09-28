@@ -3,12 +3,12 @@ package meta
 import "encoding/binary"
 
 const (
-	DATA_CLASS_RAW   = 0 //in bytes (string)
+	DATA_CLASS_RAW   = 0 //raw bytes
 	DATA_CLASS_INT   = 1
 	DATA_CLASS_UINT  = 2
 	DATA_CLASS_FLOAT = 3
 	DATA_CLASS_FLAG  = 4
-	DATA_CLASS_JSON  = 5 //UTF-8 format json string
+	DATA_CLASS_JSON  = 5 //UTF-8 format json string (used in for url fetching)
 )
 
 /**
@@ -17,6 +17,7 @@ const (
 type DataMeta struct {
 	ByteLen   int //1,2,4,8 only
 	Dimen     int
+	SampleLen int
 	Alias     string //代号
 	Unit      string //单位
 	DataClass int

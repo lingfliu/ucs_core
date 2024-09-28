@@ -44,6 +44,6 @@ func (dao *DpDao) Insert(msg *msg.DMsg) {
 	for idx, v := range msg.DataSet {
 		tableName := fmt.Sprintf("dp_%d_%d", msg.DNodeId, idx)
 		sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values (?, ?)", tableName)
-		dao.TaosCli.Exec(sql, msg.Class, msg.DNodeId, idx, msg.Ts, v)
+		dao.TaosCli.Exec(sql, msg.Mode, msg.DNodeId, idx, msg.Ts, v)
 	}
 }

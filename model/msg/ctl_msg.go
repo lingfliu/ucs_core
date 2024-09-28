@@ -20,11 +20,11 @@ type CtlCmd struct {
  * 针对单个控制点位的控制指令，为方便收发，将控制点位信息直接放入消息中
  */
 type CtlMsg struct {
-	Ts       int64
-	Idx      int    //序号
-	Mode     int    //消息类型: 0-IO模式，1-函数调用（基于URL）
 	NodeId   int64  //DD模式下可仅使用ID进行检索，受控端直接注册该ID号
 	NodeAddr string // dnode ip 或 URL, 如采用直接访问的方式需要提供
+	Ts       int64
+	Idx      int //序号
+	Mode     int //消息类型: 0-IO模式，1-函数调用（基于URL）
 	CtlCmd   *CtlCmd
 }
 
