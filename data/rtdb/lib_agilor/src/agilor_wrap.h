@@ -4,10 +4,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+    #include <stdint.h>
+
     typedef struct {
-        int64_t id;
+        long long id;
         int64_t node_id;
-        char[64] name;
+        char name[64];
         void* pt_value;
         int64_t ts;
     } ucs_pt_t;
@@ -17,7 +19,7 @@ extern "C" {
     void agilor_ucs_pt_insert(ucs_pt_t* p); //插入一个ucs点位值
     void agilor_ucs_pt_query(char* pt_id, int64_t start_time, int64_t end_time, int64_t step); //查询范围内点位值
     void agilor_ucs_pt_query_now(char* pt_id); //查询范围内点位值
-    void agilor_ucs_pt_remove_before(char* pt_id, int64_t before_time) //查询范围内点位值
+    void agilor_ucs_pt_remove_before(char* pt_id, int64_t before_time); //查询范围内点位值
 #ifdef __cplusplus
 }
 #endif
