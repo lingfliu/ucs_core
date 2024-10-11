@@ -17,6 +17,17 @@ const (
 	stableName = "th_node"
 )
 
+func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
+	//generate a template for tehunode
+	tehuNode := &model.DNode{
+		Id:        0,
+		Name:      "tehunode",
+		Addr:      "",
+		Mode:      model.DNODE_MODE_AUTO,
+		DPointSet: make(map[int64]*model.DPoint),
+	}
+	return tehuNode
+}
 func (dao *TehuNodeDao) Create() int {
 
 	sql := fmt.Sprintf("create stable if not exists %s.dp (ts timestamp, temp int, humi int) tags (dnode_id int, dp_offset int, )", stableName)
