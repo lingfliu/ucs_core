@@ -14,6 +14,8 @@ type DPoint struct {
 	Ts       int64
 	Idx      int    //序号
 	Session  string //会话标识
+	Mode     int    //监测模式(和所述node一致): 0-采样，1-事件触发，2-轮询
+	Sps      int64
 	// data could be values (data array) or url (files)
 	DataMeta *meta.DataMeta
 	Data     []byte
