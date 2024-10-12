@@ -5,7 +5,8 @@
 #define AGILORDB_SRC_COMMON_AGILOR_H_
 
 #include "agilor_defs.h"
-
+#include <stdbool.h>
+#include<stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +47,7 @@ const uint8 SCAN_DISABLE_MUSK = 0x80;  //禁止(128)
 #define WM_DRTDBAPI_STATE_SERVER_REQUEST_DISCONNECT WM_USER + 1010
 #define WM_DRTDBAPI_STATE_SENDDATA WM_USER + 1011
 
+
 enum AggregateFunction {
   AF_SUMMARY,
   AF_MINIMUM,
@@ -57,15 +59,15 @@ enum AggregateFunction {
 };
 
 typedef struct agilor_serverinfo_t {
-  char server_name[C_SERVERNAME_LEN];
-  char server_addr[C_SERVERADDR_LEN];
-  char username[C_USERNAME_LEN];
-  char password[C_PASSWORD_LEN];
+  char server_name[16];
+  char server_addr[16];
+  char username[32];
+  char password[16];
   agibool is_connected;
 } agilor_serverinfo_t;
 
 typedef struct agilor_deviceinfo_t {
-  char device_name[C_DEVICENAME_LEN];
+  char device_name[32];
   agibool is_online;
   int32 point_count;
 } agilor_deviceinfo_t;
@@ -79,7 +81,7 @@ typedef struct agilor_value_t {
     float32 rval;                  // 浮点
     int32 lval;                    // 长整
     agibool bval;                  // 开关
-    char sval[C_STRINGVALUE_LEN];  // 字符串
+    char sval[128];  // 字符串
     byte* blob_data;               // blob字节数组
   };
 } agilor_value_t;
@@ -92,9 +94,9 @@ typedef struct agilor_blob_t {
 } agilor_blob_t;
 
 typedef struct agilor_point_t {
-  char tag[C_TAGNAME_LEN];         // 测点标签 *
-  char descriptor[C_TAGDESC_LEN];  // 测点描述 #
-  char engunit[C_TAGUNIT_LEN];     // 测点数据单位（安培、摄氏度等） #
+  char tag[64];         // 测点标签 *
+  char descriptor[32];  // 测点描述 #
+  char engunit[16];     // 测点数据单位（安培、摄氏度等） #
   int32 id;                        // 测点编号，由系统配置
   uint8 type;                      // 菜单类型(R浮点数/S字符串/B开关/L整形/E枚举) *
   uint8 scan;             // 测点扫描标识(0或>=0x80："禁止"， 1："输入", 2："输出" *
@@ -105,20 +107,20 @@ typedef struct agilor_point_t {
     float32 rval;         // 浮点
     int32 lval;           // 长整
     agibool bval;         // 开关
-    char sval[C_STRINGVALUE_LEN];  // 字符串
+    char sval[128];  // 字符串
     struct {
       short type;  // 0x0001：使用key, 0x0002：使用name，0x0003表示同时使用key,name
       short key;   // 枚举(值)
-      char name[C_STRINGVALUE_LEN];  // 枚举(字符串)
+      char name[128];  // 枚举(字符串)
     } eval;                          // 枚举
   };
-  char enum_desc[C_ENUMDESC_LEN];  // 枚举描述 （"2:1,2,on:0,3,off"），暂时无用，[hp has not]
+  char enum_desc[128];  // 枚举描述 （"2:1,2,on:0,3,off"），暂时无用，[hp has not]
   int64 timedate;                  // 时间戳
   int32 state;                     // 点状态（点的质量、实时点值、缓冲的点值）
                                    // 由系统配置，覆盖添加时=old.state
-  char point_source[C_DEVICENAME_LEN];  // 测点的数据源站(设备名) *
-  char source_group[C_GROUPNAME_LEN];   // 测点的数据源结点组 #
-  char source_tag[C_SOURCETAG_LEN];     // 测点的源标签 *
+  char point_source[32];  // 测点的数据源站(设备名) *
+  char source_group[32];   // 测点的数据源结点组 #
+  char source_tag[128];     // 测点的源标签 *
 
   float32 upper_limit;                  //数据上限，用于压缩
   float32 lower_limit;                  //数据下限，用于压缩
@@ -177,7 +179,7 @@ typedef struct agilor_point_t {
 typedef struct agilor_devicepoint_t {
   int32 local_id;                    // 本地重新分配的测点id
   int32 id;                          // 测点id
-  char source_tag[C_SOURCETAG_LEN];  // 测点的源标签
+  char source_tag[128];  // 测点的源标签
   float32 exc_dev;
   int64 exc_min;
   int64 exc_max;
@@ -189,7 +191,7 @@ typedef struct agilor_devicepoint_t {
     float32 rval;
     int32 lval;
     agibool bval;
-    char sval[C_STRINGVALUE_LEN];
+    char sval[128];
   };
 } agilor_devicepoint_t;
 
@@ -209,8 +211,8 @@ typedef struct agilor_deviceconf_t {
   // TODO:
   agibool is_data_need_buffer;       // 网络断开时，是否需要缓存数据
   agibool is_buffer_data_need_send;  // 是否需要发送缓存内容
-  char device_pointtable_path[C_FILE_PATH_LEN];
-  char raw_datafile_path[C_FILE_PATH_LEN];
+  char device_pointtable_path[1024];
+  char raw_datafile_path[1024];
 } agilor_deviceconf_t;
 
 ////////////////////////////////////////////////////////////////////////
@@ -219,7 +221,7 @@ typedef struct agilor_deviceconf_t {
 
 // 0: startup success
 // -1: startup failed
-AGILOR_EXPORT int32 Agcn_Startup(uint64 thread_id = 0, agibool through_firewall = agifalse);
+AGILOR_EXPORT int32 Agcn_Startup(uint64 thread_id, agibool through_firewall);
 
 // 0: success
 // -1: has connected yet
@@ -230,7 +232,7 @@ AGILOR_EXPORT int32 Agcn_Startup(uint64 thread_id = 0, agibool through_firewall 
 // -7/-8: network error
 // -501: username or password incorrect
 AGILOR_EXPORT int32 Agcn_Connect(const char* server, const char* host_addr, const char* username,
-                                 const char* password, uint32 port = 3955);
+                                 const char* password, uint32 port);
 
 // 0: success
 // -2: remove node failed
@@ -258,8 +260,8 @@ AGILOR_EXPORT bool Agcn_ServerInfo(int32* server_id, agilor_serverinfo_t* server
 // -211: wait timed out
 // -503: has no permission to modify point
 // 其他负数：内核添加失败
-AGILOR_EXPORT int32 Agpt_AddPoint(const char* server, const agilor_point_t& point,
-                                  agibool overwrite = agitrue);
+AGILOR_EXPORT int32 Agpt_AddPoint(const char* server, const agilor_point_t point,
+                                  agibool overwrite);
 
 // 0: success
 // -3: invalid node state
@@ -330,8 +332,8 @@ AGILOR_EXPORT int32 Agpt_Point(const char* server, const char* tag, agilor_point
 // -502: has no permission to view point
 // -503: has no permission to modify point
 AGILOR_EXPORT int32 Agpt_SetPointValue(const char* server, const char* tag,
-                                       const agilor_value_t& value, agibool manual,
-                                       const char* comment = NULL);
+                                       const agilor_value_t value, agibool manual,
+                                       const char* comment);
 
 // >0: success, tag id
 // -3: invalid node state
@@ -424,7 +426,7 @@ AGILOR_EXPORT int32 Agda_BlobSnapshot(const char* server, const char* tags,
 // -502: has no permission to view point
 // -505: has no permission to view history data
 AGILOR_EXPORT agirecordset Agda_TimedValue(const char* server, const char* tag, int64 start_time,
-                                           int64 end_time, int64 step = 0);
+                                           int64 end_time, int64 step);
 
 // >0: success, record set id
 // -3: invalid node state
@@ -436,7 +438,7 @@ AGILOR_EXPORT agirecordset Agda_TimedValue(const char* server, const char* tag, 
 // -505: has no permission to view history
 // data（所有点都没有查看历史数据的权限）
 AGILOR_EXPORT agirecordset Agda_TimedValues(const char* server, const char* tags, int32 count,
-                                            int64 start_time, int64 end_time, int64 step = 0);
+                                            int64 start_time, int64 end_time, int64 step);
 
 // query blob historical data
 AGILOR_EXPORT int32 Agda_TimedBlob(const char* server, const char* tag, int64 start_time,
@@ -444,7 +446,7 @@ AGILOR_EXPORT int32 Agda_TimedBlob(const char* server, const char* tag, int64 st
                                            int32 *count, agilor_blob_t** values);
 
 AGILOR_EXPORT agibool Agda_NextValue(agirecordset recordset, char* tag, agilor_value_t* value,
-                                     agibool removed = agitrue);
+                                     agibool removed);
 
 // 所有查询到的blob数据（快照、历史数据）都必须手动调用Agdb_FreeBlob进行清理，否则会出现内存泄漏
 AGILOR_EXPORT void Agda_FreeBlob(int32 count, agilor_blob_t* values);
@@ -492,8 +494,8 @@ AGILOR_EXPORT int32 Agda_TimedValueStatistic(const char* server, const char* tag
 // -104: incorrect record set id
 AGILOR_EXPORT int32 Agda_TimedValueAggregate(agirecordset recordset, char* tag,
                                              agilor_value_t* value,
-                                             int32 statistic_type = AF_SUMMARY,
-                                             agibool removed = agitrue);
+                                             int32 statistic_type,
+                                             agibool removed);
 
 // agitrue: success
 // agifalse: close record set failed(结果集id不存在)
@@ -518,8 +520,8 @@ AGILOR_EXPORT agibool Agda_CloseRecordset(agirecordset recordset);
 // 1020: device has linked by current user
 // 1022: device link exceeds limits
 AGILOR_EXPORT int32 Agar_Register(const char* server, const char* device_name,
-                                  agibool time_sync = agifalse,
-                                  const agilor_deviceconf_t* conf = NULL);
+                                  agibool time_sync,
+                                  const agilor_deviceconf_t* conf);
 
 // =0: success
 // -3: invalid node state
@@ -548,7 +550,7 @@ AGILOR_EXPORT int32 Agar_Unregister(const char* server, const char* device_name)
 //                                   agibool filtered = agifalse);
 
 AGILOR_EXPORT int32 Agar_PutValue(const char* server, const char* source_tag,
-                                  agilor_value_t* value, agibool filtered = agifalse);
+                                  agilor_value_t* value, agibool filtered);
 
 // 根据id直接发送新的点值，不过滤，且不会更改point_value中的点属性
 // =0: success
@@ -612,10 +614,10 @@ AGILOR_EXPORT int32 Agar_GetDevicePoint(const char* server, const char* source_t
 // -20: invalid device manager
 // -21: device has not connect
 AGILOR_EXPORT int32 Agar_SetCallbackFn(
-    const char* server, void (*on_add_point)(const agilor_devicepoint_t& device_point),
-    void (*on_remove_point)(const agilor_devicepoint_t& device_point),
+    const char* server, void (*on_add_point)(const agilor_devicepoint_t device_point),
+    void (*on_remove_point)(const agilor_devicepoint_t device_point),
     void (*on_set_devicepoint_value)(int32 point_id, const char* source_tag,
-                                     const agilor_value_t& tag_val),
+                                     const agilor_value_t tag_val),
     void (*on_get_devicepoint_value)(agilor_devicepoint_t* device_point));
 
 ////////////////////////////////////////////////////////////////////////
