@@ -9,6 +9,8 @@ import (
 
 	"github.com/lingfliu/ucs_core/dao"
 	"github.com/lingfliu/ucs_core/dd"
+	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
@@ -98,7 +100,12 @@ func _task_mqtt_io(sigRun context.Context, mqttCli *dd.MqttCli) {
 
 func _task_dao_init(dao *dao.DpDao) {
 	dao.Open()
-	dao.Init()
+	dao.Init(&model.DPoint{
+		DataMeta: &meta.DataMeta{
+			DataClass: meta.DATA_CLASS_INT,
+			Dimen:     4,
+		},
+	})
 }
 
 func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDao *dao.DpDao) {

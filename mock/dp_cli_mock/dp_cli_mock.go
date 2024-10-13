@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/lingfliu/ucs_core/dd"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 	"github.com/lingfliu/ucs_core/utils"
@@ -19,11 +21,15 @@ const (
 	MQTT_TOPIC    = "ucs/dd/dp"
 	MQTT_USERNAME = "admin"
 	MQTT_PASSWORD = "admin1234"
+
+	DATA_DIMEN   = 4
+	DATA_BYTELEN = 4 //int16
 )
 
 type DNodeMock struct {
-	Class   int32
+	Class   int64
 	Id      int64
+	NoDp    int
 	DpDimen int
 	Cli     *dd.MqttCli
 }
@@ -35,6 +41,7 @@ func main() {
 	nodeList := make([]*DNodeMock, 0)
 	ctlRunList := make([]context.CancelFunc, 0)
 	for i := 0; i < 10; i++ {
+		//定义10个DNode，每个DNode包含2个DPoint
 		cli := dd.NewMqttCli(utils.IpPortJoin(MQTT_HOST, MQTT_PORT),
 			MQTT_USERNAME,
 			MQTT_PASSWORD,
@@ -42,9 +49,10 @@ func main() {
 			0,
 			3000)
 		dnode := &DNodeMock{
-			Class:   int32(i),
+			Class:   int64(i),
 			Id:      int64(i),
-			DpDimen: 4,
+			NoDp:    2,
+			DpDimen: DATA_DIMEN,
 			Cli:     cli,
 		}
 
@@ -85,20 +93,34 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 		case <-sigRun.Done():
 			dnode.Cli.Stop()
 		case <-tic.C:
-			valueList := make([]byte, 0)
-			for i := 0; i < dnode.DpDimen; i++ {
-				//random int64
-				v := utils.RandInt64(0, 10000)
-				valueList = append(valueList, byte(v))
-			}
-			ddMsg := &msg.DMsg{
+			dmsg := &msg.DMsg{
 				Ts:      time.Now().UnixNano() / 1e6, //in milliseconds
+				Sps:     100 * 1000 * 1000,
 				Mode:    0,
 				DNodeId: dnode.Id,
-				//random int64
-				DataSet: make(map[int]*msg.DData),
+				//random int32
+				DataSet: make(map[int]*msg.DMsgData),
 			}
-			bytes, err := json.Marshal(ddMsg)
+
+			for i := 0; i < dnode.NoDp; i++ {
+				//模拟部分：sampleLen=1，dimen=4，bytelen=4， MSB，随机数据
+				valueList := make([]byte, dnode.DpDimen*4)
+				for i := 0; i < dnode.DpDimen; i++ {
+					//random int32
+					v := utils.RandInt32(0, 10000)
+					binary.BigEndian.PutUint32(valueList[i*4:(i+1)*4], uint32(v))
+				}
+				dmsg.DataSet[i] = &msg.DMsgData{
+					Meta: &meta.DataMeta{
+						Dimen:     DATA_DIMEN,
+						SampleLen: 1,
+						ByteLen:   DATA_BYTELEN,
+						DataClass: meta.DATA_CLASS_INT,
+					},
+					Data: valueList,
+				}
+			}
+			bytes, err := json.Marshal(dmsg)
 			if err != nil {
 				ulog.Log().E("mock", "failed to marshal ddMsg, err: "+err.Error())
 			}

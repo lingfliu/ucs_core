@@ -1,11 +1,13 @@
 package dao
 
 import (
+	"encoding/binary"
 	"fmt"
 	"time"
 
 	"github.com/lingfliu/ucs_core/data/rtdb"
 	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 )
@@ -27,8 +29,31 @@ func (dao *DpDao) Open() {
 	dao.TaosCli.Open()
 }
 
-func (dao *DpDao) Init() {
-	sql := fmt.Sprintf("create stable if not exists %s.dp (ts timestamp, v int) tags (dnode_class int, dnode_id int, dp_offset_idx int)", dao.TaosCli.DbName)
+func (dao *DpDao) Init(template *model.DPoint) {
+
+	var valueClass string
+	if template.DataMeta.DataClass == meta.DATA_CLASS_INT {
+		valueClass = "int"
+	} else if template.DataMeta.DataClass == meta.DATA_CLASS_FLOAT {
+		valueClass = "float"
+	} else {
+		ulog.Log().E("dpdao", "unsupported data class")
+		return
+	}
+
+	dimen := template.DataMeta.Dimen
+
+	colStr := "(ts timestamp"
+
+	for i := 0; i < dimen; i++ {
+		colStr += fmt.Sprintf(", v%d %s", i, valueClass)
+	}
+	colStr += ")"
+
+	stableName := fmt.Sprintf("dp")
+
+	sql := fmt.Sprintf("create stable if not exists %s %s tags (dnode_class int, dnode_id int, dp_offset_idx int)", stableName, colStr)
+
 	res := dao.TaosCli.Exec(sql)
 	if res < 0 {
 		ulog.Log().E("dpdao", "failed to create stable dp")
@@ -42,41 +67,106 @@ func (dao *DpDao) Close() {
 }
 
 // TODO: 需要实现泛化，否则需要硬编码逐个数据结构进行实现
-func (dao *DpDao) Insert(msg *msg.DMsg) {
-	for idx, v := range msg.DataSet {
-		tableName := fmt.Sprintf("dp_%d_%d", msg.DNodeId, idx)
-		sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values (?, ?)", tableName)
-		dao.TaosCli.Exec(sql, msg.Mode, msg.DNodeId, idx, msg.Ts, v)
+func (dao *DpDao) Insert(dmsg *msg.DMsg) {
+	for idx, v := range dmsg.DataSet {
+		tableName := fmt.Sprintf("dp_%d_%d", dmsg.DNodeId, idx)
+
+		dimen := v.Meta.Dimen
+		colStr := "(?"
+		i := 0
+		for i < dimen {
+			colStr += ", ?"
+			i++
+		}
+		colStr += ")"
+
+		valueList, tsList := v.AsInt32(dmsg.Ts, dmsg.Sps, true)
+
+		for idx, ts := range tsList {
+			values := valueList[idx]
+			sql := fmt.Sprintf("insert into %s using dp tags(?,?,?) values %s", tableName, colStr)
+			anyValues := make([]any, len(values)+4)
+			anyValues[0] = dmsg.Mode
+			anyValues[1] = dmsg.DNodeId
+			anyValues[2] = dmsg.Offset
+			anyValues[3] = ts
+			for i, v := range values {
+				anyValues[i+4] = v
+			}
+			dao.TaosCli.Exec(sql, anyValues...)
+		}
 	}
 }
 
-func (dao *DpDao) Query(tic string, toc string) []*model.DPoint {
+func (dao *DpDao) Query(tic string, toc string, dnodeId int64, offset int, dataMeta *meta.DataMeta) []*model.DPoint {
+
+	dpList := make([]*model.DPoint, 0)
 	//convert date string to int64
 	tic_time, _ := time.Parse("2006-01-02 15:04:05.000", tic)
-	tic_nano := tic_time.UnixNano()
+	tic_ms := tic_time.UnixNano() / 1000000
 	toc_time, _ := time.Parse("2006-01-02 15:04:05.000", toc)
-	toc_nano := toc_time.UnixNano()
+	toc_ms := toc_time.UnixNano() / 1000000
 
-	sql := fmt.Sprintf("select * from dp where ts >= %d and ts <= %d", tic_nano, toc_nano)
+	// tableName := fmt.Sprintf("dp_%d_%d", dnodeId, offset)
+	sql := fmt.Sprintf("select * from %s where ts between %d and %d", "dp", tic_ms, toc_ms)
 	rows := dao.TaosCli.Query(sql)
 	if rows == nil {
 		ulog.Log().E("dpdao", "failed to query dp")
 	} else {
+		defer rows.Close()
 		for rows.Next() {
 			//read data
-			var ts int64
-			var v int
+			var ts string
 			var dnodeClass int
-			var dnodeId int
-			var dpOffsetIdx int
-			err := rows.Scan(&ts, &v, &dnodeClass, &dnodeId, &dpOffsetIdx)
+			var dnodeId int64
+			var dpOffset int32
+			scanned := make([]any, dataMeta.Dimen+4)
+			values := make([]int, 4)
+
+			scanned[0] = &ts
+			i := 0
+			for i < dataMeta.Dimen {
+				scanned[i+1] = &values[i]
+				i++
+			}
+			scanned[5] = &dnodeClass
+			scanned[6] = &dnodeId
+			scanned[7] = &dpOffset
+
+			err := rows.Scan(scanned...)
+
 			if err != nil {
 				ulog.Log().E("dpdao", "failed to scan dp")
 			} else {
-				ulog.Log().I("dpdao", fmt.Sprintf("ts: %d, v: %d, dnode_class: %d, dnode_id: %d, dp_offset_idx: %d", ts, v, dnodeClass, dnodeId, dpOffsetIdx))
+				t, _ := time.Parse("2006-01-02T15:04:05.000+08:00", ts)
+				t_ms := t.UnixNano()
+				// ulog.Log().I("dpdao", fmt.Sprintf("ts: %d, v: %d, dnode_class: %d, dnode_id: %d, dp_offset_idx: %d", t.UnixNano()/1000000, values[0], dnodeClass, dnodeId, dpOffsetIdx))
+
+				dp := &model.DPoint{
+					NodeId:   dnodeId,
+					Offset:   offset,
+					Ts:       t_ms,
+					DataMeta: dataMeta,
+					Data:     make([]byte, dataMeta.Dimen*dataMeta.ByteLen),
+				}
+
+				i := 0
+				for i < dataMeta.Dimen {
+					if dataMeta.ByteLen == 2 {
+						binary.BigEndian.PutUint16(dp.Data[i*dataMeta.ByteLen:(i+1)*dataMeta.ByteLen], uint16(values[i]))
+					} else if dataMeta.ByteLen == 4 {
+						binary.BigEndian.PutUint32(dp.Data[i*dataMeta.ByteLen:(i+1)*dataMeta.ByteLen], uint32(values[i]))
+					} else if dataMeta.ByteLen == 8 {
+						binary.BigEndian.PutUint64(dp.Data[i*dataMeta.ByteLen:(i+1)*dataMeta.ByteLen], uint64(values[i]))
+					}
+					i++
+				}
+
+				dpList = append(dpList, dp)
+
 			}
 		}
 	}
 
-	return make([]*model.DPoint, 0)
+	return dpList
 }

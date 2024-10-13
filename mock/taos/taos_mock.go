@@ -1,11 +1,16 @@
 package main
 
 import (
+	"encoding/binary"
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/lingfliu/ucs_core/dao"
+	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
+	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 	_ "github.com/taosdata/driver-go/v3/taosSql"
 )
@@ -39,12 +44,55 @@ func main() {
 func _task_dao_query(dao *dao.DpDao) {
 	tic := "2024-01-01 00:00:00.000"
 	toc := "2024-11-10 00:00:00.000"
-	dao.Query(tic, toc)
+
+	ptList := dao.Query(tic, toc, 1, 1, &meta.DataMeta{
+		Dimen:   4,
+		ByteLen: 4,
+	})
+	for _, pt := range ptList {
+		//serialize pt
+		ulog.Log().I("main", string(pt.Data))
+	}
+}
+
+func _task_insert(dao *dao.DpDao) {
+	dmsg := &msg.DMsg{
+		DNodeId: 1,
+		Offset:  0,
+		Ts:      time.Now().UnixNano() / 1000000,
+	}
+
+	dmsg.DataSet = make(map[int]*msg.DMsgData)
+	dmsg.DataSet[0] = &msg.DMsgData{
+		Meta: &meta.DataMeta{
+			DataClass: meta.DATA_CLASS_INT,
+			Dimen:     4,
+			SampleLen: 1,
+		},
+		Data: make([]byte, 4*4),
+	}
+
+	i := 0
+	for i < 4 {
+		binary.BigEndian.PutUint32(dmsg.DataSet[0].Data[i*4:(i+1)*4], uint32(i))
+		i++
+	}
+
+	dao.Insert(dmsg)
+
+	sql := fmt.Sprintf("insert into dp_0_0 using dp tags(0,0,0) values(?, 1,2,3,4)")
+	dao.TaosCli.Exec(sql, dmsg.Ts)
 }
 
 func _task_dao_init(dao *dao.DpDao) {
 	dao.Open()
-	dao.Init()
+	dao.Init(&model.DPoint{
+		DataMeta: &meta.DataMeta{
+			DataClass: meta.DATA_CLASS_INT,
+			Dimen:     4,
+		},
+	})
 
 	go _task_dao_query(dao)
+	// go _task_insert(dao)
 }
