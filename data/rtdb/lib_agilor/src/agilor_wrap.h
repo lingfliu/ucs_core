@@ -9,10 +9,11 @@ extern "C" {
     #include<agilor.h>
     #include<agilor_defs.h>
     #include<stdio.h>
+    #include <string.h>
 	
-    const int MAX_POINTS = 100;
     const int32_t Step = 0;
     const agibool removed = agitrue;//是否移除记录集
+    const agibool overwrite = agifalse;//添加点位遇到tag相同的点是否覆盖
 
     typedef struct {
         long long id;
@@ -58,9 +59,11 @@ extern "C" {
 
 //////////////////////////////////////////////
 ////////////Add New Funtion //////////////////
-//////////////////////////////////////////////	
-    void agilor_ucs_pt_create(ucs_pt_t* p); //创建一个ucs点位
-    void agilor_ucs_pt_drop(ucs_pt_t* p); //删除一个ucs点位
+//////////////////////////////////////////////
+    agilor_point_t ucsptToAgilorPt(ucs_pt_t* p);//ucs_pt_t转换
+	
+    void agilor_ucs_pt_create(ucs_pt_t* p,const char* server); //创建一个ucs点位
+    void agilor_ucs_pt_drop(ucs_pt_t* p,const char* server); //删除一个ucs点位
     void agilor_ucs_pt_insert(ucs_pt_t* p); //插入一个ucs点位值
     int agilor_ucs_pt_query(char* tag, int64_t start_time, int64_t end_time, int64_t step, ucs_pt_t* p_list); //查询范围内点位值
     void agilor_ucs_pt_query_now(char* tag, ucs_pt_t* pt); //查询范围内点位值

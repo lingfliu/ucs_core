@@ -12,7 +12,7 @@ int32_t c_Agcn_Startup(uint64_t thread_id, agibool through_firewall) {
             printf("启动成功。\n");
             break;
         case -1:
-            printf("启动失败。\n");1
+            printf("启动失败。\n");
             break;
         default:
             printf("未知错误代码：%d\n", Startup_result);
@@ -319,7 +319,9 @@ agirecordset c_Agda_TimedValues(const char* server, const char* tags, int32_t co
 //////////////////////////////////////////////
 
 int32_t c_Agpt_AddPoint(const char* server, const agilor_point_t point,agibool overwrite) {
+printf("--------c_Agpt_AddPoint调用成功--------\n");
     int32_t AddPoint_result = Agpt_AddPoint(server, point, overwrite);
+printf("--------Agpt_AddPoint调用成功--------\n");
     switch(AddPoint_result){
         case 0:
             printf("成功添加点。\n");
@@ -614,33 +616,49 @@ agirecordset c_Agpt_GetPointByTagMask(const char* server,char*  tag_mask){
            		break;
         		default:
             		if (result > 0) {
-                	printf("查询成功，返回记录集为:%d\n", result);
+                	printf("查询成功，返回记录集为:%lld\n", result);
 		} else {
-                		printf("未知错误 %d.\n", result);
-            				}
+                	           printf("未知错误 %lld\n", result);
+            			    }
            		 	break;
 		}
     	return result;
 
 }
 
-///////////////////////////////////////////////////////////////////
-//////////////////////Add New Fun//////////////////////////////
-/////////////////////////////////////////////////////////////////////
-
-
-
-
-
 
 ///////////////////////////////////////////////
 /////////////New function//////////////////
 /////////////////////////////////////////////
-void agilor_ucs_pt_create(ucs_pt_t* p) {
+agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
+    agilor_point_t pt = {};
+    strncpy(pt.tag, p->tag, sizeof(p->tag));
+    pt.tag[sizeof(p->tag) - 1] = '\0';  
+    strncpy(pt.descriptor, p->descrip, sizeof(p->descrip));
+    pt.descriptor[sizeof(p->descrip) - 1] = '\0';  
+    pt.timedate = p->ts;
 
+    return pt;
 }
-void agilor_ucs_pt_drop(ucs_pt_t* p) {
 
+
+agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
+    agilor_value_t value = {};
+    value.timedate = p->ts;
+    value.blob_data = (uint8_t*)p->pt_value;
+
+    return value;
+}
+
+void agilor_ucs_pt_create(ucs_pt_t* p,const char* server) {
+    agilor_point_t pt = ucsptToAgilorPt(p);
+printf("--------ucsptToAgilorPt调用结束--------\n");
+    c_Agpt_AddPoint(server, pt,overwrite);
+printf("--------Agpt_AddPoint调用结束--------\n");
+}
+
+void agilor_ucs_pt_drop(ucs_pt_t* p,const char* server) {  
+    c_Agpt_RemovePoint(server, p->id);
 }
 void agilor_ucs_pt_insert(ucs_pt_t* p) {
 

@@ -22,6 +22,7 @@ int main() {
 	   //尝试连接数据库
 	 int32_t connectResult = c_Agcn_Connect(server, host_addr, username, password, port);
 
+
 	/////////////////////////////////////////////
 	/////////////////Agda//////////////////////
 	////////////////////////////////////////////
@@ -119,6 +120,25 @@ int64_t start_time = 1672531200; // 2023-01-01 00:00:00 UTC
 
     }
 
+
+//////////////////////////////////
+////////10.13测试addPoint//////
+////////////////////////////////////
+
+
+ucs_pt_t p;
+
+strncpy(p.tag, "testPoint_1", sizeof(p.tag) - 1);
+    p.tag[sizeof(p.tag) - 1] = '\0'; 
+    strncpy(p.descrip, "测试点1", sizeof(p.descrip) - 1);
+    p.descrip[sizeof(p.descrip) - 1] = '\0';  // 确保字符串以 null 结尾
+    // 赋值其他成员
+    p.id = 1;
+    p.node_id = 123;
+    p.pt_value = NULL;  // 初始化为 NULL 或者指向有效的数据
+    p.ts =1728798010;
+    ucs_pt_t* pt = &p;
+    agilor_ucs_pt_create( pt,server);
 
 
 //若连接成功则断开连接
