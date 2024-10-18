@@ -59,7 +59,7 @@ enum AggregateFunction {
 };
 
 typedef struct agilor_serverinfo_t {
-  char server_name[16];
+  char server_name[16];   
   char server_addr[16];
   char username[32];
   char password[16];
