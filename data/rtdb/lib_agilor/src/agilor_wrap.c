@@ -681,7 +681,7 @@ agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
     strncpy(pt.point_source, "DV3", sizeof(pt.point_source) - 1);
     pt.point_source[sizeof(pt.point_source) - 1] = '\0';
     strncpy(pt.source_tag, "testDev", sizeof(pt.source_tag) - 1);
-    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  // 确保以 null 终止符结尾
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
    
     return pt;
 }
