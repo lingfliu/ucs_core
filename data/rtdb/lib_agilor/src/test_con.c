@@ -26,19 +26,19 @@ int main() {
 	/////////////////////////////////////////////
 	/////////////////Agda//////////////////////
 	////////////////////////////////////////////
-	
+/*	
 	//订阅 查询订阅数据
 	c_Agda_Subscribe(server,"R_point1",1);
 	char server1[]="issc-dev-lingfliu.lan";
 	agilor_value_t test_val = {0};
 	char tag_Agda[64];
 	c_Agda_GetSubscribeValue(server1,tag_Agda, &test_val);
-	printf("timedate:%lld,state:%d,type:%d",test_val.timedate,test_val.state,test_val.type);
+	printf("timedate:%lld,state:%d,type:%d\n",test_val.timedate,test_val.state,test_val.type);
 	//c_Agda_Unsubscribe(server, "R_point2", 3);
 
 	//c_Agda_NextValue(125,"R_point1",&test_val,false);
 	
-
+**/
 //查询实时库中所有设备信息(其中device_info还包含其他的信息未输出)
 	agirecordset  recordset =  c_Agpt_DeviceInfo(server);
 	int32_t device_id=0;
@@ -46,18 +46,10 @@ int main() {
 	while(Agpt_NextDeviceInfo(recordset, &device_id, &device_info)){
 	 printf("返回的设备信息：设备id:%d,设备名：%s，设备测点数量：%d\n",device_id,device_info.device_name,device_info.point_count);
 	}
-//gpt_NextDeviceInfo(recordset, &device_id, &device_info);
-//rintf("返回的设备信息：设备id:%d,设备名：%s，设备测点数量：%d\n",device_id,device_info.device_name,device_info.point_count);
-/*	
-	//查询指定ID的测点的标签
-	char tag[128];
-	c_Agpt_Tag(server,1002, tag);
-	printf("id为1002的测点的标签为：%s\n",tag);
 
-*/
 //查寻指定设备上的测点数量
 	int32_t count;
-	char name[5]="DV1";
+	char name[5]="DV2";
 	const char* device_name=name;
 	c_Agpt_PointCount(server,device_name, &count);
 
@@ -81,6 +73,9 @@ int main() {
 		printf("查询到实时数据库信息：server_id：%d,server_name:%s,server_addr:%s,username:%s,password:%s.\n",server_id,server_info.server_name,server_info.server_addr,server_info.username,server_info.password);
 	}  
 
+
+
+/*
 
 int64_t start_time = 1672531200; // 2023-01-01 00:00:00 UTC
 
@@ -119,28 +114,48 @@ int64_t start_time = 1672531200; // 2023-01-01 00:00:00 UTC
         printf("c_Agda_TimedValues 请求失败。\n");
 
     }
+**/
 
-
-//////////////////////////////////
-////////10.13测试addPoint//////
+/////////////////////////////////////
+////////10.13测试addPoint////////
 ////////////////////////////////////
-
-
-ucs_pt_t p;
-
+/*
+ucs_pt_t p = {};
+int value = 2; 
 strncpy(p.tag, "testPoint_1", sizeof(p.tag) - 1);
     p.tag[sizeof(p.tag) - 1] = '\0'; 
     strncpy(p.descrip, "测试点1", sizeof(p.descrip) - 1);
     p.descrip[sizeof(p.descrip) - 1] = '\0';  // 确保字符串以 null 结尾
     // 赋值其他成员
-    p.id = 1;
+    p.id = 3;
     p.node_id = 123;
-    p.pt_value = NULL;  // 初始化为 NULL 或者指向有效的数据
+    p.pt_value =&value;  // 初始化为 NULL 或者指向有效的数据
     p.ts =1728798010;
-    ucs_pt_t* pt = &p;
-    agilor_ucs_pt_create( pt,server);
+    
+   // agilor_ucs_pt_create( &p);
 
+agilor_ucs_pt_drop(&p);
+**/
 
+/////////////////////////////////////
+///////////////insert///////////////
+///////////////////////////////////
+
+/*
+printf("11111111");
+ucs_pt_t p = {};
+uint8_t v = 66;
+strncpy(p.tag, "R_point1001", sizeof(p.tag) - 1);
+    p.tag[sizeof(p.tag) - 1] = '\0'; 
+    strncpy(p.descrip, "测试点1", sizeof(p.descrip) - 1);
+    p.descrip[sizeof(p.descrip) - 1] = '\0';  // 确保字符串以 null 结尾
+    // 赋值其他成员
+    //p.id = 3;
+    p.node_id = 123;
+    p.pt_value = &v;  
+    p.ts =1728798017;
+    agilor_ucs_pt_insert(&p);
+**/
 //若连接成功则断开连接
 	   if (connectResult == 0) {
 		int disconnectResult =c_Agcn_Disconnect(server);

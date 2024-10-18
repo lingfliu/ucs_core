@@ -58,12 +58,12 @@ extern "C" {
     int32_t c_Agpt_Tag(const char* server, int32_t point_id, char* tag);
 
 //////////////////////////////////////////////
-////////////Add New Funtion //////////////////
+////////////Add New Funtion //////////////
 //////////////////////////////////////////////
     agilor_point_t ucsptToAgilorPt(ucs_pt_t* p);//ucs_pt_t转换
-	
-    void agilor_ucs_pt_create(ucs_pt_t* p,const char* server); //创建一个ucs点位
-    void agilor_ucs_pt_drop(ucs_pt_t* p,const char* server); //删除一个ucs点位
+    void getServer(char* server);
+    void agilor_ucs_pt_create(ucs_pt_t* p); //创建一个ucs点位
+    void agilor_ucs_pt_drop(ucs_pt_t* p); //删除一个ucs点位
     void agilor_ucs_pt_insert(ucs_pt_t* p); //插入一个ucs点位值
     int agilor_ucs_pt_query(char* tag, int64_t start_time, int64_t end_time, int64_t step, ucs_pt_t* p_list); //查询范围内点位值
     void agilor_ucs_pt_query_now(char* tag, ucs_pt_t* pt); //查询范围内点位值

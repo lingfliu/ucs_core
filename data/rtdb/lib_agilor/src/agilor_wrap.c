@@ -626,18 +626,63 @@ agirecordset c_Agpt_GetPointByTagMask(const char* server,char*  tag_mask){
 
 }
 
+int32_t c_Agpt_SetPointValue(const char* server, const char* tag,const agilor_value_t value, agibool manual,const char* comment){
+printf("-----------c_Agpt_SetPointValue成功调用-----------");
+    int32_t result = Agpt_SetPointValue(server,tag,value,manual,comment);
+    switch(result) {
+        case 0:
+        printf("成功插入数据\n");
+        break;
+        case -3:
+        printf("连接点状态错误\n");
+        break;
+        case -4:
+        printf("没有连接到实时数据库\n");
+        break;
+        case -201:
+        printf("发送请求失败\n");
+        break;
+        case -211:
+        printf("等待超时\n");
+        break;
+        case -101:
+        printf("标签tag错误\n");
+        break;
+        case -502:
+        printf("没有查看测点的权限\n");
+        break;
+        case -503:
+        printf("没有修改测点的权限\n");
+        break;
+        default:
+        if (result > 0) {
+        printf("查询成功，返回记录集为:%d\n", result);
+	} else {
+                    printf("未知错误 %d\n", result);
+          }
+        break;
+    }
+    return result;
+}
 
 ///////////////////////////////////////////////
 /////////////New function//////////////////
 /////////////////////////////////////////////
 agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
     agilor_point_t pt = {};
+    pt.id = p->id;
     strncpy(pt.tag, p->tag, sizeof(p->tag));
     pt.tag[sizeof(p->tag) - 1] = '\0';  
     strncpy(pt.descriptor, p->descrip, sizeof(p->descrip));
     pt.descriptor[sizeof(p->descrip) - 1] = '\0';  
     pt.timedate = p->ts;
 
+    //暂时赋值测试 
+    strncpy(pt.point_source, "DV3", sizeof(pt.point_source) - 1);
+    pt.point_source[sizeof(pt.point_source) - 1] = '\0';
+    strncpy(pt.source_tag, "testDev", sizeof(pt.source_tag) - 1);
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  // 确保以 null 终止符结尾
+   
     return pt;
 }
 
@@ -645,24 +690,46 @@ agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
 agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
     agilor_value_t value = {};
     value.timedate = p->ts;
-    value.blob_data = (uint8_t*)p->pt_value;
-
+    value.blob_data = p->pt_value;
     return value;
 }
 
-void agilor_ucs_pt_create(ucs_pt_t* p,const char* server) {
+// 获取服务器名    PS.通过这种方式获取服务器名会报错 并且c_Agcn_ServerInfo函数获取信息，打印的server_name与真实值不一致
+    void getServer(char* server){
+    agilor_serverinfo_t server_info ={};
+    int32_t server_id=0;
+    if(c_Agcn_ServerInfo(&server_id,&server_info)){
+        strncpy(server, server_info.server_name, sizeof(server_info.server_name));
+        server[sizeof(server_info.server_name) - 1] = '\0';
+    }
+}
+
+void agilor_ucs_pt_create(ucs_pt_t* p) {
     agilor_point_t pt = ucsptToAgilorPt(p);
-printf("--------ucsptToAgilorPt调用结束--------\n");
+    char server[16];  
+    getServer(server);
     c_Agpt_AddPoint(server, pt,overwrite);
 printf("--------Agpt_AddPoint调用结束--------\n");
 }
 
-void agilor_ucs_pt_drop(ucs_pt_t* p,const char* server) {  
+void agilor_ucs_pt_drop(ucs_pt_t* p) {
+    agilor_serverinfo_t server_info ={};
+    char server[16];  
+    getServer(server);
     c_Agpt_RemovePoint(server, p->id);
-}
-void agilor_ucs_pt_insert(ucs_pt_t* p) {
 
 }
+void agilor_ucs_pt_insert(ucs_pt_t* p) {
+    char server[16];  
+    getServer(server);
+    agibool manual = agifalse;
+    const char* comment =NULL;
+    agilor_value_t value = {};
+    value = ucsptToAgilorValue(p);
+    printf("-------ucsptToAgilorValue------");
+    c_Agpt_SetPointValue(server,p->tag,value,manual,comment);
+}
+
 int agilor_ucs_pt_query(char* tag, int64_t start_time, int64_t end_time, int64_t step, ucs_pt_t* pt_list) {
 
 }
