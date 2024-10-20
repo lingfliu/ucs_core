@@ -14,14 +14,18 @@ import (
 
 /**
  * @brief
- * DPoint 数据点位CURD接口
+ * DPoint 数据点位CRUD接口
  * 基于TDengine实现
+ * 超表命名规则: dp_{node_class}
+ * 标签: dnode_id bigint | dpoint_id bigint | pos varchar
  */
 type DpDao struct {
+	ColNameList string[]
+	Template *model.DPoint
 	TaosCli *rtdb.TaosCli
 }
 
-func NewDpDao(host string, dbName string, username string, password string) *DpDao {
+func NewDpDao(host string, dbName string, username string, password string, template model.DPoint, colNameList string[]) *DpDao {
 	return &DpDao{TaosCli: rtdb.NewTaosCli(host, dbName, username, password)}
 }
 
@@ -29,6 +33,7 @@ func (dao *DpDao) Open() {
 	dao.TaosCli.Open()
 }
 
+func (dao *DpDao) Init() {
 func (dao *DpDao) TableExist(tableName string) bool {
 	sql := fmt.Sprintf("show tables like '%s'", tableName)
 	rows := dao.TaosCli.Query(sql)

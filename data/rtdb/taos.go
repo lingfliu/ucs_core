@@ -120,10 +120,12 @@ func (cli *TaosCli) Query(sql string) *sql.Rows {
 	return rows
 }
 
+//TODO: improve this
 func (cli *TaosCli) CreateSTable(stableName string, columns string, tag_columns string) {
 	cli.taos.Exec(fmt.Sprintf("create stable if not exist %s.%s(%s) tags(%s)", cli.DbName, stableName, columns, tag_columns))
 }
 
+//TODO: improve this
 func (cli *TaosCli) CreateTable(tableName string, stableName string, tags []string) {
 	tagStr := ""
 	tagStr += tags[0]
@@ -133,6 +135,7 @@ func (cli *TaosCli) CreateTable(tableName string, stableName string, tags []stri
 	cli.taos.Exec(fmt.Sprintf("create table if not exist %s using %s.%s tags(%s)", tableName, cli.DbName, stableName, tagStr))
 }
 
+//TODO: improve this
 func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
 	columnStr := ""
 	for _, column := range columns {
@@ -145,6 +148,7 @@ func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
 	cli.taos.Exec(fmt.Sprintf("insert into %s values(%s) tags(%s)", tableName, columnStr, tagStr))
 }
 
+//TODO: improve this
 func (cli *TaosCli) QueryAll(dbName string, tableName string) {
 	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s", dbName, tableName))
 	if err != nil {
@@ -153,6 +157,7 @@ func (cli *TaosCli) QueryAll(dbName string, tableName string) {
 	defer rows.Close()
 }
 
+//TODO: improve this
 func (cli *TaosCli) QueryByTime(tableName string, tic string, toc string) {
 
 	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s where ts<%s and ts > %s", cli.DbName, tableName, tic, toc))
