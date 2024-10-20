@@ -29,7 +29,22 @@ func (dao *DpDao) Open() {
 	dao.TaosCli.Open()
 }
 
-func (dao *DpDao) Init(template *model.DPoint) {
+func (dao *DpDao) TableExist(tableName string) bool {
+	sql := fmt.Sprintf("show tables like '%s'", tableName)
+	rows := dao.TaosCli.Query(sql)
+	if rows == nil {
+		ulog.Log().E("dpdao", "no table found")
+		return false
+	} else {
+		defer rows.Close()
+		if rows.Next() {
+			return true
+		}
+	}
+	return false
+}
+
+func (dao *DpDao) InitTable(template *model.DPoint) int {
 
 	var valueClass string
 	if template.DataMeta.DataClass == meta.DATA_CLASS_INT {
@@ -38,7 +53,7 @@ func (dao *DpDao) Init(template *model.DPoint) {
 		valueClass = "float"
 	} else {
 		ulog.Log().E("dpdao", "unsupported data class")
-		return
+		return -1
 	}
 
 	dimen := template.DataMeta.Dimen
@@ -52,21 +67,21 @@ func (dao *DpDao) Init(template *model.DPoint) {
 
 	stableName := fmt.Sprintf("dp")
 
-	sql := fmt.Sprintf("create stable if not exists %s %s tags (dnode_class int, dnode_id int, dp_offset_idx int)", stableName, colStr)
+	sql := fmt.Sprintf("create stable if not exists %s %s tags (dnode_name nchar(32), dpoint_name nchar(32), dnode_id int, dp_offset int, dpoint_unit binary(16))", stableName, colStr)
 
 	res := dao.TaosCli.Exec(sql)
 	if res < 0 {
-		ulog.Log().E("dpdao", "failed to create stable dp")
+		ulog.Log().E("dpdao", fmt.Sprintf("failed to create stable %s", stableName))
 	} else {
-		ulog.Log().I("dpdao", "create stable dp success")
+		ulog.Log().I("dpdao", fmt.Sprintf("create stable %s success", stableName))
 	}
+	return res
 }
 
 func (dao *DpDao) Close() {
 	dao.TaosCli.Close()
 }
 
-// TODO: 需要实现泛化，否则需要硬编码逐个数据结构进行实现
 func (dao *DpDao) Insert(dmsg *msg.DMsg) {
 	for idx, v := range dmsg.DataSet {
 		tableName := fmt.Sprintf("dp_%d_%d", dmsg.DNodeId, idx)

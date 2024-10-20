@@ -6,6 +6,7 @@ import (
 
 	"github.com/lingfliu/ucs_core/dao"
 	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
@@ -14,30 +15,85 @@ type TehuNodeDao struct {
 }
 
 const (
-	stableName = "th_node"
+	stableName = "tehu_node"
 )
 
 func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 	//generate a template for tehunode
 	tehuNode := &model.DNode{
 		Id:        0,
-		Name:      "tehunode",
+		Name:      stableName,
 		Addr:      "",
 		Mode:      model.DNODE_MODE_AUTO,
 		DPointSet: make(map[int64]*model.DPoint),
 	}
+
+	//temperate dpoint
+	tehuNode.DPointSet[0] = &model.DPoint{
+		Id:     0,
+		Name:   "温度",
+		NodeId: 0,
+		Offset: 0,
+
+		Ts:      0,
+		Idx:     0,
+		Session: "",
+		DataMeta: &meta.DataMeta{
+			DataClass: meta.DATA_CLASS_INT,
+			ByteLen:   4,
+			Dimen:     1,
+			SampleLen: 1,
+			Alias:     "",
+		},
+		Data: make([]byte, 4),
+	}
+
+	//humidity dpoint
+	tehuNode.DPointSet[1] = &model.DPoint{
+		Id:     0,
+		Name:   "湿度",
+		NodeId: 0,
+		Offset: 1,
+
+		Ts:      0,
+		Idx:     0,
+		Session: "",
+		DataMeta: &meta.DataMeta{
+			DataClass: meta.DATA_CLASS_INT,
+			ByteLen:   4,
+			Dimen:     1,
+			SampleLen: 1,
+			Alias:     "",
+		},
+		Data: make([]byte, 4),
+	}
 	return tehuNode
 }
-func (dao *TehuNodeDao) Create() int {
 
-	sql := fmt.Sprintf("create stable if not exists %s.dp (ts timestamp, temp int, humi int) tags (dnode_id int, dp_offset int, )", stableName)
-	res := dao.TaosCli.Exec(sql)
-	if res < 0 {
-		ulog.Log().E("dpdao", "failed to create stable dp")
-	} else {
-		ulog.Log().I("dpdao", "create stable dp success")
+func (d *TehuNodeDao) TableExist() bool {
+	for _, v := range d.GenerateTemplate().DPointSet {
+		if !d.DpDao.TableExist(fmt.Sprintf("%s_%d_%d", stableName, v.NodeId, v.Offset)) {
+			return false
+		}
 	}
-	return res
+	return true
+}
+
+// 初始化表
+func (d *TehuNodeDao) InitTable() int {
+
+	dd := dao.DpDao{}
+
+	for _, v := range d.GenerateTemplate().DPointSet {
+		//TODO: return error
+		res := dd.InitTable(v)
+		if res < 0 {
+			ulog.Log().E("dpdao", "failed to init table")
+			return -1
+		}
+	}
+	ulog.Log().I("dpdao", "init table success")
+	return 0
 }
 
 func (dao *TehuNodeDao) Insert(p *model.DPoint) {
