@@ -119,6 +119,10 @@ int64_t start_time = 1672531200; // 2023-01-01 00:00:00 UTC
 /////////////////////////////////////
 ////////10.13测试addPoint////////
 ////////////////////////////////////
+char server2[32];
+getServer(server2);
+printf("服务器名:%s\n",server2);
+
 /*
 ucs_pt_t p = {};
 int value = 2; 
@@ -132,9 +136,9 @@ strncpy(p.tag, "testPoint_1", sizeof(p.tag) - 1);
     p.pt_value =&value;  // 初始化为 NULL 或者指向有效的数据
     p.ts =1728798010;
     
-   // agilor_ucs_pt_create( &p);
+    agilor_ucs_pt_create( &p);
 
-agilor_ucs_pt_drop(&p);
+//agilor_ucs_pt_drop(&p);
 **/
 
 /////////////////////////////////////

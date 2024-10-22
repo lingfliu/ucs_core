@@ -699,8 +699,10 @@ agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
     agilor_serverinfo_t server_info ={};
     int32_t server_id=0;
     if(c_Agcn_ServerInfo(&server_id,&server_info)){
-        strncpy(server, server_info.server_name, sizeof(server_info.server_name));
-        server[sizeof(server_info.server_name) - 1] = '\0';
+        strncpy(server, server_info.server_name, sizeof(server)-1);
+        server[sizeof(server) - 1] = '\0';
+printf("服务器名：%s\n",server);
+printf("服务器名：%s\n",server_info.server_name);
     }
 }
 
