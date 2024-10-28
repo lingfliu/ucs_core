@@ -42,11 +42,11 @@ extern "C" {
     agibool c_Agda_NextValue(agirecordset recordset,  char* tag, agilor_value_t* value,agibool removed);
     agirecordset c_Agda_TimedValue(const char* server, const char* tag, int64_t start_time,int64_t end_time, int64_t step);
     agirecordset c_Agda_TimedValues(const char* server, const char* tags, int32_t count, int64_t start_time, int64_t end_time, int64_t step);
-
+    agirecordset c_Agda_Snapshot(const char* server, const char* tags, int32_t count);
 //////////////////////////////////////////////
-////////////Agilor Point //// ////////////////
-//////////////////////////////////////////////
-    int32_t c_Agpt_AddPoint(const char* server, const agilor_point_t point,agibool overwrite);
+////////////Agilor Point //// ///////////////
+////////////////////////////////////////////
+    int32_t c_Agpt_AddPoint(const char* server, const agilor_point_t *point,agibool overwrite);
     int32_t c_Agpt_RemovePoint(const char* server, int32_t point_id);
     agirecordset c_Agpt_DeviceInfo(const char* server);
     agibool c_Agpt_NextDeviceInfo(agirecordset recordset, int32_t* device_id,agilor_deviceinfo_t* device_info);
@@ -56,9 +56,16 @@ extern "C" {
     int32_t c_Agpt_Point(const char* server, const char* tag, agilor_point_t* point);
     int32_t c_Agpt_PointExist(const char* server, const char* tag);
     int32_t c_Agpt_Tag(const char* server, int32_t point_id, char* tag);
-
+    int32_t c_Agpt_SetPointValue(const char* server, const char* tag,const agilor_value_t *value, agibool manual,const char* comment);
+/////////////////////////////////////////////
+/////////////Agar Function/////////////////
+////////////////////////////////////////////
+//const agilor_deviceconf_t* conf = NULL：注册设备时的配置信息
+//agibool time_sync = agifalse:是否将本地时间同步为服务端时间
+    int32_t c_Agar_Register(const char* server, const char* device_name,agibool time_sync,const agilor_deviceconf_t* conf);
+    int32_t c_Agar_Unregister(const char* server, const char* device_name);
 //////////////////////////////////////////////
-////////////Add New Funtion //////////////
+////////////Add New Function //////////////
 //////////////////////////////////////////////
     agilor_point_t ucsptToAgilorPt(ucs_pt_t* p);//ucs_pt_t转换
     agilor_value_t ucsptToAgilorValue(ucs_pt_t* p);
