@@ -309,19 +309,48 @@ agirecordset c_Agda_TimedValues(const char* server, const char* tags, int32_t co
     return result;
 }
 
-
-
-
+agirecordset c_Agda_Snapshot(const char* server, const char* tags, int32_t count){
+    agirecordset result = Agda_Snapshot(server,tags,count);
+    if (result > 0) {
+        printf("查询成功，记录集 ID: %lld\n", result);
+    } else {
+        switch (result) {
+            case -3:
+                printf("连接点状态错误\n");
+                break;
+            case -4:
+                printf("没有连接到实时数据库\n");
+                break;
+            case -101:
+                printf("标签tag错误\n");
+                break;
+            case -201:
+                printf("发送请求失败\n");
+                break;
+            case -211:
+                printf("等待超时\n");
+                break;
+            case -502:
+                printf("没有查看测点的权限\n");
+                break;
+            case -504:
+                printf("没有查看测点快照的权限\n");
+                break;
+            default:
+                printf("未知错误：%lld\n", result);
+                break;
+        }
+    }
+    return result;
+}
 
 
 //////////////////////////////////////////////
 ////////Agilor Point Function ////////////////
 //////////////////////////////////////////////
 
-int32_t c_Agpt_AddPoint(const char* server, const agilor_point_t point,agibool overwrite) {
-printf("--------c_Agpt_AddPoint调用成功--------\n");
+int32_t c_Agpt_AddPoint(const char* server, const agilor_point_t *point,agibool overwrite) {
     int32_t AddPoint_result = Agpt_AddPoint(server, point, overwrite);
-printf("--------Agpt_AddPoint调用成功--------\n");
     switch(AddPoint_result){
         case 0:
             printf("成功添加点。\n");
@@ -343,7 +372,7 @@ printf("--------Agpt_AddPoint调用成功--------\n");
             break;
         default:
             if (AddPoint_result < 0)
-                printf("服务端错误。\n");
+                printf("服务端错误。%d\n",AddPoint_result);
             else
                 printf("未知错误：%d\n", AddPoint_result);
             break;
@@ -355,7 +384,7 @@ int32_t c_Agpt_RemovePoint(const char* server, int32 point_id) {
     int32_t RemovePoint_result = Agpt_RemovePoint(server, point_id);
     switch(RemovePoint_result){
         case 0:
-            printf("成功移除点。\n");
+            printf("成功移除id：%d的点。\n",point_id);
             break;
         case -3:
             printf("连接点状态出错。\n");
@@ -410,8 +439,7 @@ int32_t c_Agpt_RemovePoint(const char* server, int32 point_id) {
     return recordset;
 }
 
-agibool c_Agpt_NextDeviceInfo(agirecordset recordset, int32_t* device_id,
-                                            agilor_deviceinfo_t* device_info) {
+agibool c_Agpt_NextDeviceInfo(agirecordset recordset, int32_t* device_id,agilor_deviceinfo_t* device_info) {
     agibool NextDeviceInfo_result = Agpt_NextDeviceInfo(recordset, device_id, device_info);
     if(NextDeviceInfo_result == agitrue){
         printf("成功获取设备信息。\n");
@@ -626,8 +654,7 @@ agirecordset c_Agpt_GetPointByTagMask(const char* server,char*  tag_mask){
 
 }
 
-int32_t c_Agpt_SetPointValue(const char* server, const char* tag,const agilor_value_t value, agibool manual,const char* comment){
-printf("-----------c_Agpt_SetPointValue成功调用-----------");
+int32_t c_Agpt_SetPointValue(const char* server, const char* tag,const agilor_value_t *value, agibool manual,const char* comment){
     int32_t result = Agpt_SetPointValue(server,tag,value,manual,comment);
     switch(result) {
         case 0:
@@ -664,72 +691,158 @@ printf("-----------c_Agpt_SetPointValue成功调用-----------");
     }
     return result;
 }
+/////////////////////////////////////////////
+/////////////Agar Function/////////////////
+////////////////////////////////////////////
+int32_t c_Agar_Register(const char* server, const char* device_name,agibool time_sync,const agilor_deviceconf_t* conf){
+    int32_t result = Agar_Register(server,device_name,time_sync,conf);
+     switch(result) {
+        case 0:
+        printf("设备注册成功\n");
+        break;
+        case -3:
+        printf("连接点状态错误\n");
+        break;
+        case -4:
+        printf("没有连接到实时数据库\n");
+        break;
+        case -20:
+        printf("设备管理器无效\n");
+        break;
+        case -22:
+        printf("设备已经注册\n");
+        break;
+        case -23:
+        printf("获取完成事件失败\n");
+        break;
+        case -201:
+        printf("发送请求失败\n");
+        break;
+        case -211:
+        printf("等待超时\n");
+        break;
+        case -507:
+        printf("没有更新实时数据的权限\n");
+        break;
+        case 1002:
+        printf("系统内部错误1002：sys not init\n");
+        break;
+        case 1004:
+        printf("系统内部错误1004：sys not start\n");
+        break;
+        case 1019:
+        printf("系统内部错误1019：device not exist\n");
+        break;
+        case 1020:
+        printf("系统内部错误1020：device has linked by current user\n");
+        break;
+        case 1022:
+        printf("系统内部错误1022：device linkage exceeds limits\n");
+        break;
+        default:   
+         printf("未知错误 %d\n", result);
+         break;
+    }
+    return result;
+  }
+
+
+
+int32_t c_Agar_Unregister(const char* server, const char* device_name){
+     int32_t result = Agar_Unregister(server,device_name);
+     switch(result) {
+        case 0:
+        printf("设备注册断开成功\n");
+        break;
+        case -3:
+        printf("连接点状态错误\n");
+        break;
+        case -4:
+        printf("没有连接到实时数据库\n");
+        break;
+        case -20:
+        printf("设备管理器无效\n");
+        break;
+        case -21:
+        printf("设备已断开注册\n");
+        break;
+        case -23:
+        printf("获取完成事件失败\n");
+        break;
+        case -201:
+        printf("发送请求失败\n");
+        break;
+        case -211:
+        printf("等待超时\n");
+        break;
+        default:   
+         printf("未知错误 %d\n", result);
+         break;
+    }
+    return result;
+}
+
 
 ///////////////////////////////////////////////
 /////////////New function//////////////////
 /////////////////////////////////////////////
 agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
     agilor_point_t pt = {};
-    pt.id = p->id;
-    strncpy(pt.tag, p->tag, sizeof(p->tag));
-    pt.tag[sizeof(p->tag) - 1] = '\0';  
-    strncpy(pt.descriptor, p->descrip, sizeof(p->descrip));
-    pt.descriptor[sizeof(p->descrip) - 1] = '\0';  
-    pt.timedate = p->ts;
-
-    //暂时赋值测试 
-    strncpy(pt.point_source, "DV3", sizeof(pt.point_source) - 1);
-    pt.point_source[sizeof(pt.point_source) - 1] = '\0';
-    strncpy(pt.source_tag, "testDev", sizeof(pt.source_tag) - 1);
+    strncpy(pt.tag, p->tag, sizeof(pt.tag));
+    pt.tag[sizeof(pt.tag) - 1] = '\0';  
+    strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
+    pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
+    strncpy(pt.source_tag, p->tag, sizeof(pt.source_tag) - 1);
     pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
-   
+    pt.type = 'R';
+ 
     return pt;
 }
-
-
+   
 agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
     agilor_value_t value = {};
     value.timedate = p->ts;
-    value.blob_data = p->pt_value;
+
+    float *ptvalue = (float *)p->pt_value;
+
+    value.rval = *ptvalue;
+    value.type = 'R';
     return value;
 }
 
-// 获取服务器名    PS.通过这种方式获取服务器名会报错 并且c_Agcn_ServerInfo函数获取信息，打印的server_name与真实值不一致
-    void getServer(char* server){
-    agilor_serverinfo_t server_info ={};
-    int32_t server_id=0;
-    if(c_Agcn_ServerInfo(&server_id,&server_info)){
-        strncpy(server, server_info.server_name, sizeof(server)-1);
-        server[sizeof(server) - 1] = '\0';
-printf("服务器名：%s\n",server);
-printf("服务器名：%s\n",server_info.server_name);
-    }
-}
-
 void agilor_ucs_pt_create(ucs_pt_t* p) {
-    agilor_point_t pt = ucsptToAgilorPt(p);
-    char server[16];  
-    getServer(server);
-    c_Agpt_AddPoint(server, pt,overwrite);
-printf("--------Agpt_AddPoint调用结束--------\n");
+    //agilor_point_t  pt = ucsptToAgilorPt(p);
+    agilor_point_t pt = {};
+    pt.type = 'R';
+    strncpy(pt.tag, p->tag, sizeof(pt.tag) - 1);
+    pt.tag[sizeof(pt.tag) - 1] = '\0'; 
+    strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
+    pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
+    strncpy(pt.source_tag, "testPoint_4", sizeof(pt.source_tag) - 1);
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
+    const char* server = "Agilor";
+    printf("tag:%s,Device:%s,Type:%c,sourceTag:%s\n",pt.tag,pt.point_source,pt.type,pt.source_tag);
+    c_Agpt_AddPoint(server, &pt,agitrue);
+
 }
 
 void agilor_ucs_pt_drop(ucs_pt_t* p) {
-    agilor_serverinfo_t server_info ={};
-    char server[16];  
-    getServer(server);
+    char server[16]="Agilor";  
     c_Agpt_RemovePoint(server, p->id);
 
 }
 void agilor_ucs_pt_insert(ucs_pt_t* p) {
-    char server[16];  
-    getServer(server);
+    char server[16]="Agilor";  
     agibool manual = agifalse;
     const char* comment =NULL;
     agilor_value_t value = {};
+    //agilor_deviceconf_t conf = {};
     value = ucsptToAgilorValue(p);
-    printf("-------ucsptToAgilorValue------");
-    c_Agpt_SetPointValue(server,p->tag,value,manual,comment);
+    char* device_name="DV1";
+    c_Agar_Register(server,device_name,agifalse,NULL);
+    c_Agpt_SetPointValue(server,p->tag,&value,manual,comment);
+    c_Agar_Unregister(server,device_name);
+
 }
 
 int agilor_ucs_pt_query(char* tag, int64_t start_time, int64_t end_time, int64_t step, ucs_pt_t* pt_list) {
