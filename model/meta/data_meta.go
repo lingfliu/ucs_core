@@ -17,7 +17,7 @@ const (
 	DATA_CLASS_FLOAT  = 9
 	DATA_CLASS_DOUBLE = 10
 	DATA_CLASS_FLAG   = 11
-	DATA_CLASS_JSON   = 12 //UTF-8 format json string (used in for url fetching)
+	DATA_CLASS_JSON   = 12 //UTF-8 format json string (used for url fetching)
 )
 
 /**

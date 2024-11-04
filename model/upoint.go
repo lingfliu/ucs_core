@@ -4,6 +4,7 @@ import (
 	"github.com/lingfliu/ucs_core/model/meta"
 )
 
+// deprecated
 type UPoint struct {
 	Id         int64
 	NodeId     int64

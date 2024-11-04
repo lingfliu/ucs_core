@@ -62,6 +62,7 @@ func main() {
 	mqttCli.Start()
 
 	//intialize DAO
+	//TODO: template declaration
 	dpDao := dao.NewDpDao(utils.IpPortJoin(taosCfg.Host, taosCfg.Port), taosCfg.DbName, taosCfg.Username, taosCfg.Password)
 	go _task_dao_init(dpDao)
 
@@ -100,9 +101,9 @@ func _task_mqtt_io(sigRun context.Context, mqttCli *dd.MqttCli) {
 
 func _task_dao_init(dao *dao.DpDao) {
 	dao.Open()
-	dao.Init(&model.DPoint{
+	dao.InitTable(&model.DPoint{
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT,
+			DataClass: meta.DATA_CLASS_INT32,
 			Dimen:     4,
 		},
 	})

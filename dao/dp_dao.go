@@ -20,12 +20,11 @@ import (
  * 标签: dnode_id bigint | dpoint_id bigint | pos varchar
  */
 type DpDao struct {
-	ColNameList string[]
 	Template *model.DPoint
-	TaosCli *rtdb.TaosCli
+	TaosCli  *rtdb.TaosCli
 }
 
-func NewDpDao(host string, dbName string, username string, password string, template model.DPoint, colNameList string[]) *DpDao {
+func NewDpDao(host string, dbName string, username string, password string, template model.DPoint) *DpDao {
 	return &DpDao{TaosCli: rtdb.NewTaosCli(host, dbName, username, password)}
 }
 
@@ -51,7 +50,7 @@ func (dao *DpDao) TableExist(tableName string) bool {
 func (dao *DpDao) InitTable(template *model.DPoint) int {
 
 	var valueClass string
-	if template.DataMeta.DataClass == meta.DATA_CLASS_INT {
+	if template.DataMeta.DataClass == meta.DATA_CLASS_INT32 {
 		valueClass = "int"
 	} else if template.DataMeta.DataClass == meta.DATA_CLASS_FLOAT {
 		valueClass = "float"

@@ -115,7 +115,7 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 						Dimen:     DATA_DIMEN,
 						SampleLen: 1,
 						ByteLen:   DATA_BYTELEN,
-						DataClass: meta.DATA_CLASS_INT,
+						DataClass: meta.DATA_CLASS_INT32,
 					},
 					Data: valueList,
 				}

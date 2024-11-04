@@ -2,7 +2,8 @@ package model
 
 import "github.com/lingfliu/ucs_core/model/meta"
 
-type DData struct {
+//deprecated
+type UData struct {
 	NodeId  int64
 	PointId int64
 	Addr    string

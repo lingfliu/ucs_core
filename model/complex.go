@@ -1,9 +1,9 @@
 package model
 
 /**
- * 工地
+ * 结构体
  */
-type Site struct {
+type Complex struct {
 	CamSet  map[int64]*Cam
 	NodeSet map[int64]*UNode
 	MachSet map[int64]*Mach

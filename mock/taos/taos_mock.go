@@ -65,7 +65,7 @@ func _task_insert(dao *dao.DpDao) {
 	dmsg.DataSet = make(map[int]*msg.DMsgData)
 	dmsg.DataSet[0] = &msg.DMsgData{
 		Meta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT,
+			DataClass: meta.DATA_CLASS_INT32,
 			Dimen:     4,
 			SampleLen: 1,
 		},
@@ -86,9 +86,9 @@ func _task_insert(dao *dao.DpDao) {
 
 func _task_dao_init(dao *dao.DpDao) {
 	dao.Open()
-	dao.Init(&model.DPoint{
+	dao.InitTable(&model.DPoint{
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT,
+			DataClass: meta.DATA_CLASS_INT32,
 			Dimen:     4,
 		},
 	})

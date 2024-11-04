@@ -14,6 +14,7 @@ const (
 	ERR_CODE_DRIFT    = 4 //漂移
 )
 
+//deprecated
 /**
  * 基础物模型：基于IO读写控制的节点模型
  * 1. 基本属性：id，归属，描述，
@@ -24,6 +25,7 @@ const (
  * 6. 数据点位
  */
 
+// TODO: remove
 type UNode struct {
 	Id       int64 //数据库检索用
 	ParentId int64
