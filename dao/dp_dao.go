@@ -33,7 +33,6 @@ func (dao *DpDao) Open() {
 	dao.TaosCli.Open()
 }
 
-func (dao *DpDao) Init() {
 func (dao *DpDao) TableExist(tableName string) bool {
 	sql := fmt.Sprintf("show tables like '%s'", tableName)
 	rows := dao.TaosCli.Query(sql)

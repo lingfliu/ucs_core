@@ -39,7 +39,7 @@ func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 		Idx:     0,
 		Session: "",
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT,
+			DataClass: meta.DATA_CLASS_INT32,
 			ByteLen:   4,
 			Dimen:     1,
 			SampleLen: 1,
@@ -59,7 +59,7 @@ func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 		Idx:     0,
 		Session: "",
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT,
+			DataClass: meta.DATA_CLASS_INT32,
 			ByteLen:   4,
 			Dimen:     1,
 			SampleLen: 1,
@@ -103,6 +103,7 @@ func (dao *TehuNodeDao) Insert(p *model.DPoint) {
 	tableName := fmt.Sprintf("%s_%d_%d", stableName, p.NodeId, p.Offset)
 	sql := fmt.Sprintf("insert into %s using %s values(?, ?, ?) tags(?, ?)", tableName, stableName)
 	dao.TaosCli.Exec(sql, p.Ts, int(temp), int(humi), p.NodeId, p.Offset)
+
 }
 
 func (dao *TehuNodeDao) Query(nodeId int, tic int64, toc int64) []*model.DPoint {
