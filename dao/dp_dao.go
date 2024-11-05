@@ -13,6 +13,7 @@ import (
 )
 
 /**
+ * TODO: data point
  * @brief
  * DPoint 数据点位CRUD接口
  * 基于TDengine实现
@@ -52,7 +53,8 @@ func (dao *DpDao) TableExist(tableName string) bool {
 func (dao *DpDao) InitTable(template *model.DPoint) int {
 
 	var valueClass string
-	if template.DataMeta.DataClass == meta.DATA_CLASS_INT {
+	if template.DataMeta.DataClass == meta.DATA_CLASS_INT16 ||
+		template.DataMeta.DataClass == meta.DATA_CLASS_INT32 {
 		valueClass = "int"
 	} else if template.DataMeta.DataClass == meta.DATA_CLASS_FLOAT {
 		valueClass = "float"

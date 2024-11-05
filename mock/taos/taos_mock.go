@@ -26,6 +26,7 @@ func main() {
 	ulog.Config(ulog.LOG_LEVEL_DEBUG, "", false)
 
 	//config taos
+	//TODO: fix the password
 	dpDao := dao.NewDpDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
 	go _task_dao_init(dpDao)
 

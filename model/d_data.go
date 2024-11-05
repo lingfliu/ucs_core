@@ -17,7 +17,7 @@ type DnData struct {
 	Session   string
 	Sps       int64
 	SampleLen int
-	Pos       *gis.GPos //could be null
+	Pos       *gis.GPos //optional
 
 	DpDataList []*DpData
 }

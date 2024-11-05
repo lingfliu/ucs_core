@@ -17,13 +17,13 @@ func NewTehuNode(id int64, name string, addr string) *model.DNode {
 	// 	Unit:    "℃/%",
 	// }
 	node := &model.DNode{
-		Id:        id,
-		Name:      name,
-		Addr:      addr,
-		Descrip:   "温湿度传感器",
-		PropSet:   make(map[string]string),
-		DPointSet: make(map[int64]*model.DPoint),
-		State:     model.DNODE_STATE_OK,
+		Id:         id,
+		Name:       name,
+		Addr:       addr,
+		Descrip:    "温湿度传感器",
+		PropSet:    make(map[string]string),
+		DPointList: make([]*model.DPoint, 2),
+		State:      model.DNODE_STATE_OK,
 	}
 
 	// point := model.NewDPoint(0, id, 0, 0, 0, dmeta, []byte{0, 0, 0, 0, 0, 0, 0, 0})

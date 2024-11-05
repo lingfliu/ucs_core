@@ -6,6 +6,7 @@ import (
 
 /**
  * Ctl cmd to a ctlPoint
+ * (not used)
  */
 type CtlData struct {
 	NodeId   int64
@@ -18,5 +19,5 @@ type CtlData struct {
 
 	Mode     int //inherit from ctlpoint
 	DataMeta *meta.DataMeta
-	Data     any
+	Data     []byte
 }
