@@ -260,7 +260,7 @@ AGILOR_EXPORT bool Agcn_ServerInfo(int32* server_id, agilor_serverinfo_t* server
 // -211: wait timed out
 // -503: has no permission to modify point
 // 其他负数：内核添加失败
-AGILOR_EXPORT int32 Agpt_AddPoint(const char* server, const agilor_point_t point,
+AGILOR_EXPORT int32 Agpt_AddPoint(const char* server, const agilor_point_t *point,
                                   agibool overwrite);
 
 // 0: success
@@ -331,9 +331,7 @@ AGILOR_EXPORT int32 Agpt_Point(const char* server, const char* tag, agilor_point
 // -101: incorrect tag
 // -502: has no permission to view point
 // -503: has no permission to modify point
-AGILOR_EXPORT int32 Agpt_SetPointValue(const char* server, const char* tag,
-                                       const agilor_value_t value, agibool manual,
-                                       const char* comment);
+AGILOR_EXPORT int32 Agpt_SetPointValue(const char* server, const char* tag,const agilor_value_t *value, agibool manual,const char* comment);
 
 // >0: success, tag id
 // -3: invalid node state

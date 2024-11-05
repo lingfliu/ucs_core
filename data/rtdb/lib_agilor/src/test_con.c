@@ -1,7 +1,8 @@
 #include"agilor_wrap.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <time.h>       // 包含 time() 函数的头文件
+#include <sys/time.h>
 
 int main() {
 
@@ -13,7 +14,7 @@ int main() {
 	  }
 
 	   //数据库连接参数
-	   const char* server = "issc-dev-lingfliu.lan";
+	   const char* server = "Agilor";
 	   const char* host_addr = "192.168.66.27";
 	   const char* username = "test";
 	   const char* password = "123";
@@ -37,16 +38,18 @@ int main() {
 	//c_Agda_Unsubscribe(server, "R_point2", 3);
 
 	//c_Agda_NextValue(125,"R_point1",&test_val,false);
-	
-**/
+**/	
+
 //查询实时库中所有设备信息(其中device_info还包含其他的信息未输出)
-	agirecordset  recordset =  c_Agpt_DeviceInfo(server);
+    void PointNumber(){
+                agirecordset  recordset =  c_Agpt_DeviceInfo(server);
 	int32_t device_id=0;
 	agilor_deviceinfo_t device_info;
 	while(Agpt_NextDeviceInfo(recordset, &device_id, &device_info)){
 	 printf("返回的设备信息：设备id:%d,设备名：%s，设备测点数量：%d\n",device_id,device_info.device_name,device_info.point_count);
 	}
-
+}
+/*
 //查寻指定设备上的测点数量
 	int32_t count;
 	char name[5]="DV2";
@@ -74,89 +77,107 @@ int main() {
 	}  
 
 
-
-/*
-
-int64_t start_time = 1672531200; // 2023-01-01 00:00:00 UTC
-
-    int64_t end_time = 1672534800;   // 2023-01-01 01:00:00 UTC
-
-    int64_t step = 3600;             // 1 hour
-
-
-    agirecordset result = c_Agda_TimedValue(server, tag, start_time, end_time, step);
-
-    if (result > 0) {
-
-        printf("c_Agda_TimedValue 请求成功，记录集 ID: %lld\n",result);
-
-    } else {
-
-        printf("c_Agda_TimedValue 请求失败。\n");
-
-    }
-
-
-    // 测试 c_Agda_TimedValues
-
-    const char* tags = "sensor1,sensor2,sensor3";
-
-    int32_t count1 = 3;
-
-    result = c_Agda_TimedValues(server, tags, count1, start_time, end_time, step);
-
-    if (result > 0) {
-
-        printf("c_Agda_TimedValues 请求成功，记录集 ID: %lld\n",result);
-
-    } else {
-
-        printf("c_Agda_TimedValues 请求失败。\n");
-
-    }
 **/
 
+
+
+
 /////////////////////////////////////
-////////10.13测试addPoint////////
+////////测试addPoint////////
 ////////////////////////////////////
 
 /*
-ucs_pt_t p = {};
-int value = 2; 
-strncpy(p.tag, "testPoint_1", sizeof(p.tag) - 1);
-    p.tag[sizeof(p.tag) - 1] = '\0'; 
-    strncpy(p.descrip, "测试点1", sizeof(p.descrip) - 1);
-    p.descrip[sizeof(p.descrip) - 1] = '\0';  // 确保字符串以 null 结尾
-    // 赋值其他成员
-    p.id = 3;
-    p.node_id = 123;
-    p.pt_value =&value;  // 初始化为 NULL 或者指向有效的数据
-    p.ts =1728798010;
+printf("*******addPoint测试********\n");
+
+    agilor_point_t pt = {};
     
-    agilor_ucs_pt_create( &p);
+    pt.type = 'L';
+    strncpy(pt.tag, "testPoint_14", sizeof(pt.tag) - 1);
+    pt.tag[sizeof(pt.tag) - 1] = '\0'; 
+    strncpy(pt.point_source, "DV3",sizeof(pt.point_source) - 1);
+    pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
+    strncpy(pt.source_tag, "testPoint_5", sizeof(pt.source_tag) - 1);
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
 
-//agilor_ucs_pt_drop(&p);
+    strncpy(pt.descriptor, "测试点", sizeof(pt.descriptor) - 1);
+    pt.descriptor[sizeof(pt.descriptor) - 1] = '\0';
+    pt.archive = agitrue;
+    pt.compress = agifalse;
+    pt.scan = SCAN_OUTPUT;
+    c_Agpt_AddPoint(server, &pt,agitrue);
+    PointNumber();
 **/
+ 
 
-/////////////////////////////////////
-///////////////insert///////////////
-///////////////////////////////////
+//PS:tag相同的点位会被覆盖
+printf("*******createPoint测试********\n");
+ucs_pt_t p = {};
+strncpy(p.tag, "testPoint_144", sizeof(p.tag) - 1);
+    p.tag[sizeof(p.tag) - 1] = '\0'; 
+    time_t create_now;
+    time(&create_now);
+    p.ts =(int64_t)create_now*1000;
+    agilor_ucs_pt_create( &p);
+    PointNumber();
+
 
 /*
-printf("11111111");
+//根据点位ID删除
+printf("*******dropPoint测试********\n");
+    ucs_pt_t p = {};
+    p.id = 3000;
+    agilor_ucs_pt_drop(&p);
+    PointNumber();
+**/
+/*
+printf("*******insertPoint测试********\n");
+//agilor_value_t  p = {};
 ucs_pt_t p = {};
-uint8_t v = 66;
-strncpy(p.tag, "R_point1001", sizeof(p.tag) - 1);
-    p.tag[sizeof(p.tag) - 1] = '\0'; 
-    strncpy(p.descrip, "测试点1", sizeof(p.descrip) - 1);
-    p.descrip[sizeof(p.descrip) - 1] = '\0';  // 确保字符串以 null 结尾
-    // 赋值其他成员
-    //p.id = 3;
-    p.node_id = 123;
-    p.pt_value = &v;  
-    p.ts =1728798017;
+strncpy(p.tag, "testPoint_14", sizeof(p.tag) - 1);
+   p.tag[sizeof(p.tag) - 1] = '\0'; 
+    double a=999;
+    p.pt_value =&a;  
+    time_t insrt_now;
+    time(&insrt_now);
+    p.ts =(int64_t)insrt_now*1000;
     agilor_ucs_pt_insert(&p);
 **/
+
+printf("*******QuaryByTime测试********\n");
+
+    int64_t start_time =1708581463414;
+    time_t now;
+    time(&now);
+    int64_t end_time =(int64_t)now*1000;; 
+    int64_t step = 0;            
+    char tag[64] = "testPoint_144";
+    agirecordset result = c_Agda_TimedValue(server, tag, start_time,end_time,step);
+    if (result > 0) {
+    char tag1[64];
+    agilor_value_t value;
+        while(c_Agda_NextValue(result,tag1,&value,agitrue)){
+	printf("tagName:%s,time:%lld,数据值value:%lf\n",tag1,value.timedate,value.rval);
+        }
+    } else {
+        printf("c_Agda_TimedValue 请求失败。\n");
+}
+
+
+printf("********Snapshot测试***********\n");
+    char tags[32] = "testPoint_144";
+     int32_t count =1;
+     agirecordset  res1 = c_Agda_Snapshot(server,tags,count);
+     if (res1 > 0) {
+     char tag[32];
+     agilor_value_t value;
+     while(c_Agda_NextValue(res1,tag,&value,agitrue)){
+	printf("tagName:%s,time:%lld,数据值value:%lf\n",tag,value.timedate,value.rval);
+        }
+    } else {
+        printf("Snapshot请求失败。\n");
+}
+
+
 //若连接成功则断开连接
 	   if (connectResult == 0) {
 		int disconnectResult =c_Agcn_Disconnect(server);
