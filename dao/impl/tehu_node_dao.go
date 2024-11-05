@@ -7,6 +7,7 @@ import (
 	"github.com/lingfliu/ucs_core/dao"
 	"github.com/lingfliu/ucs_core/model"
 	"github.com/lingfliu/ucs_core/model/meta"
+	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
 )
 
@@ -39,7 +40,7 @@ func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 		Idx:     0,
 		Session: "",
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT32,
+			DataClass: meta.DATA_CLASS_INT,
 			ByteLen:   4,
 			Dimen:     1,
 			SampleLen: 1,
@@ -59,7 +60,7 @@ func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 		Idx:     0,
 		Session: "",
 		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT32,
+			DataClass: meta.DATA_CLASS_INT,
 			ByteLen:   4,
 			Dimen:     1,
 			SampleLen: 1,
@@ -68,6 +69,19 @@ func (dao *TehuNodeDao) GenerateTemplate() *model.DNode {
 		Data: make([]byte, 4),
 	}
 	return tehuNode
+}
+
+func (dao *TehuNodeDao) Create() int {
+
+	sql := fmt.Sprintf("create stable if not exists %s (ts timestamp, temp int, humi int) tags (dnode_id int, dnode_offset int)", stableName)
+	res := dao.TaosCli.Exec(sql)
+	if res < 0 {
+		ulog.Log().E("dpdao", fmt.Sprintf("failed to create stable %s", stableName))
+	} else {
+		ulog.Log().I("dpdao", fmt.Sprintf("create stable %s success", stableName))
+	}
+
+	return res
 }
 
 func (d *TehuNodeDao) TableExist() bool {
@@ -96,14 +110,33 @@ func (d *TehuNodeDao) InitTable() int {
 	return 0
 }
 
-func (dao *TehuNodeDao) Insert(p *model.DPoint) {
-	//子表命名方式 ${stablename}_${nodeid}_${dp_offset}
-	temp := binary.BigEndian.Uint32(p.Data[:3])
-	humi := binary.BigEndian.Uint32(p.Data[4:])
-	tableName := fmt.Sprintf("%s_%d_%d", stableName, p.NodeId, p.Offset)
-	sql := fmt.Sprintf("insert into %s using %s values(?, ?, ?) tags(?, ?)", tableName, stableName)
-	dao.TaosCli.Exec(sql, p.Ts, int(temp), int(humi), p.NodeId, p.Offset)
+// func (dao *TehuNodeDao) Insert(p *model.DPoint) {
+// 	//子表命名方式 ${stablename}_${nodeid}_${dp_offset}
+// 	temp := binary.BigEndian.Uint32(p.Data[:3])
+// 	humi := binary.BigEndian.Uint32(p.Data[4:])
+// 	tableName := fmt.Sprintf("%s_%d_%d", stableName, p.NodeId, p.Offset)
+// 	sql := fmt.Sprintf("insert into %s using %s values(?, ?, ?) tags(?, ?)", tableName, stableName)
+// 	dao.TaosCli.Exec(sql, p.Ts, int(temp), int(humi), p.NodeId, p.Offset)
+// }
 
+func (dao *TehuNodeDao) Insert(p *msg.DMsg) {
+	//表名${stablename}_${DNodeId}_${Offset}
+	tableName := fmt.Sprintf("%s_%d_%d", stableName, p.DNodeId, p.Offset)
+	var temp, humi uint32
+	// 遍历 DataSet 以提取温度和湿度
+	for i, DMsgData := range p.DataSet {
+		if DMsgData.Meta.Dimen == 1 {
+			value := binary.BigEndian.Uint32(DMsgData.Data[0:4])
+			if i == 0 {
+				temp = value // 第一个数据点为温度
+			} else if i == 1 {
+				humi = value // 第二个数据点为湿度
+			}
+		}
+	}
+	insertSQL := fmt.Sprintf("insert into %s using %s TAGS (%d, %d) VALUES (NOW(), %d, %d)", tableName, stableName, p.DNodeId, p.Offset, temp, humi)
+	fmt.Println("[SQL]" + insertSQL)
+	dao.TaosCli.Exec(insertSQL)
 }
 
 func (dao *TehuNodeDao) Query(nodeId int, tic int64, toc int64) []*model.DPoint {
