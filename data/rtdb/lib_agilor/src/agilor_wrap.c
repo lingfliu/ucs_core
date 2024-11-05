@@ -226,9 +226,9 @@ agibool c_Agda_GetSubscribeValue(char* server, char* tag, agilor_value_t* value)
 agibool c_Agda_NextValue(agirecordset recordset, char* tag, agilor_value_t* value, agibool removed) {
     agibool result = Agda_NextValue(recordset, tag, value, removed);
     if (result == true) {
-        printf("成功枚举历史数据\n");
+        printf("成功枚举数据\n");
     } else {
-        printf("枚举失败\n");
+        printf("枚举结束\n");
     }
     return result;
 }
@@ -793,37 +793,27 @@ agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
     strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
     pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
     strncpy(pt.source_tag, p->tag, sizeof(pt.source_tag) - 1);
-    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';
+    pt.timedate = p->ts;
     pt.type = 'R';
- 
+    pt.scan = 1;
+    pt.archive = agitrue;
     return pt;
 }
    
 agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
     agilor_value_t value = {};
     value.timedate = p->ts;
-
-    float *ptvalue = (float *)p->pt_value;
-
+    double *ptvalue = (double *)p->pt_value;
     value.rval = *ptvalue;
     value.type = 'R';
     return value;
 }
 
 void agilor_ucs_pt_create(ucs_pt_t* p) {
-    //agilor_point_t  pt = ucsptToAgilorPt(p);
-    agilor_point_t pt = {};
-    pt.type = 'R';
-    strncpy(pt.tag, p->tag, sizeof(pt.tag) - 1);
-    pt.tag[sizeof(pt.tag) - 1] = '\0'; 
-    strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
-    pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
-    strncpy(pt.source_tag, "testPoint_4", sizeof(pt.source_tag) - 1);
-    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
+    agilor_point_t  pt = ucsptToAgilorPt(p);
     const char* server = "Agilor";
-    printf("tag:%s,Device:%s,Type:%c,sourceTag:%s\n",pt.tag,pt.point_source,pt.type,pt.source_tag);
     c_Agpt_AddPoint(server, &pt,agitrue);
-
 }
 
 void agilor_ucs_pt_drop(ucs_pt_t* p) {
