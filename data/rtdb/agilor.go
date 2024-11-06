@@ -33,6 +33,29 @@ import (
 )
 
 /**
+ * 将数据转换为C的数据类型，默认情况下只针对agilor_value_t内union字段进行转换，其他字段不支持处理
+ */
+func TypeConvert(data []byte, dataMeta model.DataMeta) any {
+	if dataMeta.Type == model.TYPE_FLOAT32 {
+		return C.float32(*(*float32)(unsafe.Pointer(&data[0])))
+	} else if dataMeta.Type == model.TYPE_INT32 {
+		return C.int32(*(*int32)(unsafe.Pointer(&data[0])))
+	} else if dataMeta.Type == model.TYPE_BOOL {
+		return C.agibool(*(*bool)(unsafe.Pointer(&data[0])))
+	} else if dataMeta.Type == model.TYPE_STRING {
+		if data.len() > 128 {
+			return C.CString(string(data[:128]))
+		} else {
+			return C.CString(string(data))
+		}
+	} else if dataMeta.Type == model.TYPE_BLOB {
+		return unsafe.Pointer(&data[0])
+	} else {
+		return nil
+	}
+}
+
+/**
  * 调用创建表的C接口，
  * 这里仅将pt转换为C.ucs_pt_t, 再从c结构转换为agilor定义的结构
  * 存储在agilor数据库的内容仅包括：tag，name/descrip, value，其他全部放在mysql里面

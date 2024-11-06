@@ -22,6 +22,7 @@ extern "C" {
         char tag[64];
         void* pt_value;
         int64_t ts;
+        int32_t type;
     } ucs_pt_t;
 
 //////////////////////////////////////////////
