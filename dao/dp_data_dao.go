@@ -200,19 +200,19 @@ func (dao *DpDataDao) Insert(dmsg *msg.DMsg) int {
 	return 0
 }
 
-func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId int64, offset int, dataMeta *meta.DataMeta) ([]int64, *model.DpData) {
+func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId int64, dpointOffset int, limit int, offset int, dataMeta *meta.DataMeta) ([]int64, *model.DpData) {
 
 	tsList := make([]int64, 0)
 	data := make([]any, 0)
 
 	//convert date string to int64
 	tic_time, _ := time.Parse("2006-01-02 15:04:05.000", tic)
-	tic_ms := tic_time.UnixNano() / 1000000
+	tic_ms := tic_time.UnixMilli()
 	toc_time, _ := time.Parse("2006-01-02 15:04:05.000", toc)
-	toc_ms := toc_time.UnixNano() / 1000000
+	toc_ms := toc_time.UnixMilli()
 
-	tableName := CreateSTableName(dnodeClass, offset)
-	sql := fmt.Sprintf("select * from %s where ts between %d and %d", tableName, tic_ms, toc_ms)
+	tableName := CreateSTableName(dnodeClass, dpointOffset)
+	sql := fmt.Sprintf("select * from %s where ts between %d and %d and dnode_id = %d and dpoint_offset = %d limit %d offset %d", tableName, tic_ms, toc_ms, dnodeId, dpointOffset, limit, offset)
 	rows := dao.TaosCli.Query(sql)
 	if rows == nil {
 		ulog.Log().E("dpdao", "failed to query dp")
@@ -226,7 +226,7 @@ func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId i
 			var dnodeName string
 			var dpAlias string
 			var dpUnit string //not used
-			scanned := make([]any, dataMeta.Dimen+4)
+			scanned := make([]any, dataMeta.Dimen+6)
 
 			values := make([]any, dataMeta.Dimen)
 
@@ -249,12 +249,15 @@ func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId i
 			if err != nil {
 				ulog.Log().E("dpdao", "failed to scan dp")
 			} else {
-				t, _ := time.Parse("2006-01-02T15:04:05.000+08:00", ts)
-				ts := t.UnixNano()
-				// ulog.Log().I("dpdao", fmt.Sprintf("ts: %d, v: %d, dnode_class: %d, dnode_id: %d, dp_offset_idx: %d", t.UnixNano()/1000000, values[0], dnodeClass, dnodeId, dpOffsetIdx))
+				// Handle both with and without milliseconds
+				t, err := time.Parse("2006-01-02T15:04:05.000+08:00", ts)
+				if err != nil {
+					t, _ = time.Parse("2006-01-02T15:04:05+08:00", ts)
+				}
+				ts_ms := t.UnixMilli()
 
-				tsList = append(tsList, ts)
-				data = append(data, values...)
+				tsList = append(tsList, ts_ms)
+				data = append(data, values)
 			}
 		}
 	}
@@ -263,6 +266,66 @@ func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId i
 		Offset:   offset,
 		DataMeta: dataMeta,
 		Data:     data,
+	}
+}
+
+func (dao *DpDataDao) AggrQuery(tic string, toc string, dnodeClass string, dnodeId int64, offset int, idx int, dataMeta *meta.DataMeta, window int64, step int64, ops []int) ([]int64, *model.DpData) {
+	//convert date string to int64
+	tic_time, _ := time.Parse("2006-01-02 15:04:05.000", tic)
+	tic_ms := tic_time.UnixMilli()
+	toc_time, _ := time.Parse("2006-01-02 15:04:05.000", toc)
+	toc_ms := toc_time.UnixMilli()
+	tableName := CreateSTableName(dnodeClass, offset)
+
+	var opCodes []string
+	for _, op := range ops {
+		opCodes = append(opCodes, dao.TaosCli.GenAggrOpCode(op))
+	}
+
+	colStr := ""
+	var colName string
+	if dataMeta.ValAlias != nil && len(dataMeta.ValAlias) > idx {
+		colName = dataMeta.ValAlias[idx]
+	} else {
+		colName = fmt.Sprintf("v%d", idx)
+	}
+	for _, op := range opCodes {
+		colStr += fmt.Sprintf("%s(%s),", op, colName)
+	}
+
+	for i := 0; i < dataMeta.Dimen; i++ {
+		colStr += fmt.Sprintf("%s(v%d)", opCodes[i], i)
+	}
+
+	sql := fmt.Sprintf("select _wstart, _wend, %s from %s where ts between %d and %d interval(%s) sliding(%s)", colStr, tableName, tic_ms, toc_ms, window, step)
+	rows := dao.TaosCli.Query(sql)
+	tsList := make([]int64, 0)
+	aggrList := make([]any, 0)
+	if rows == nil {
+		ulog.Log().E("dpdao", "failed to query dp")
+	} else {
+		defer rows.Close()
+		for rows.Next() {
+			//read data
+			var tStart int64
+			var tEnd int64
+			data := make([]float64, len(opCodes))
+			scanned := make([]any, len(opCodes)+2)
+			scanned[0] = &tStart
+			scanned[1] = &tEnd
+			for i := 0; i < len(opCodes); i++ {
+				scanned[i+2] = &data[i]
+			}
+			rows.Scan(scanned)
+			tsList = append(tsList, tStart)
+			aggrList = append(aggrList, data)
+		}
+	}
+
+	return tsList, &model.DpData{
+		Offset:   offset,
+		DataMeta: dataMeta,
+		Data:     aggrList,
 	}
 }
 

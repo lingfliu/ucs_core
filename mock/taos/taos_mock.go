@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
 	"os/signal"
 	"time"
@@ -26,8 +27,9 @@ func main() {
 	//config taos
 	//TODO: fix the password
 	dpDataDao := dao.NewDpDataDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
-	go _task_dao_init(dpDataDao)
+	// go _task_dao_init(dpDataDao)
 	// go _task_insert(dpDataDao)
+	go _task_dao_query(dpDataDao)
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
@@ -41,17 +43,17 @@ func main() {
 	}
 }
 
-func _task_dao_query(dao *dao.DpDao) {
+func _task_dao_query(dao *dao.DpDataDao) {
+	dao.Open()
 	tic := "2024-01-01 00:00:00.000"
 	toc := "2024-11-10 00:00:00.000"
 
-	ptList := dao.Query(tic, toc, 1, 1, &meta.DataMeta{
-		Dimen:   4,
+	tsList, dpData := dao.Query(tic, toc, "tehu_tsi_002", 0, 0, 100, 100, &meta.DataMeta{
+		Dimen:   1,
 		ByteLen: 4,
 	})
-	for _, pt := range ptList {
-		//serialize pt
-		ulog.Log().I("main", string(pt.Data))
+	for _, ts := range tsList {
+		ulog.Log().I("main", fmt.Sprintf("ts: %d, %f", ts, dpData.Data[0].([]any)[0].(float32)))
 	}
 }
 
@@ -169,5 +171,5 @@ func _task_dao_init(dao *dao.DpDataDao) {
 	}
 
 	// go _task_dao_query(dao)
-	go _task_insert(dao)
+	// go _task_insert(dao)
 }

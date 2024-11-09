@@ -11,6 +11,14 @@ import (
 const (
 	TAOS_STATE_DISCONNECTED = 0
 	TAOS_STATE_CONNECTED    = 1
+
+	TAOS_AGGR_AVG   = 0
+	TAOS_AGGR_COUNT = 1
+	TAOS_AGGR_SUM   = 2
+	TAOS_AGGR_STD   = 3
+	TAOS_AGGR_MAX   = 4
+	TAOS_AGGR_MIN   = 5
+	TAOS_AGGR_RANGE = 6 //max-min
 )
 
 type TaosCli struct {
@@ -29,6 +37,27 @@ func NewTaosCli(host string, dbName string, username string, password string) *T
 		DbName:   dbName,
 		Username: username,
 		Password: password,
+	}
+}
+
+func (cli *TaosCli) GenAggrOpCode(op int) string {
+	switch op {
+	case TAOS_AGGR_AVG:
+		return "avg"
+	case TAOS_AGGR_COUNT:
+		return "count"
+	case TAOS_AGGR_SUM:
+		return "sum"
+	case TAOS_AGGR_STD:
+		return "stddev"
+	case TAOS_AGGR_RANGE:
+		return "spread"
+	case TAOS_AGGR_MAX:
+		return "max"
+	case TAOS_AGGR_MIN:
+		return "min"
+	default:
+		return "avg"
 	}
 }
 
