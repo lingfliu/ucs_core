@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
 	"os"
 	"os/signal"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
 	"github.com/lingfliu/ucs_core/ulog"
-	_ "github.com/taosdata/driver-go/v3/taosSql"
 )
 
 const (
@@ -27,8 +25,9 @@ func main() {
 
 	//config taos
 	//TODO: fix the password
-	dpDao := dao.NewDpDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
-	go _task_dao_init(dpDao)
+	dpDataDao := dao.NewDpDataDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
+	go _task_dao_init(dpDataDao)
+	// go _task_insert(dpDataDao)
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
@@ -56,44 +55,119 @@ func _task_dao_query(dao *dao.DpDao) {
 	}
 }
 
-func _task_insert(dao *dao.DpDao) {
-	dmsg := &msg.DMsg{
-		DNodeId: 1,
-		Offset:  0,
-		Ts:      time.Now().UnixNano() / 1000000,
+func _task_insert(dao *dao.DpDataDao) {
+	idx := 0
+	tic := time.Tick(20 * time.Millisecond)
+	for {
+
+		select {
+		case <-tic:
+			dmsg := &msg.DMsg{
+				DNodeId:    0, //should provide at least id / name / addr
+				DNodeAddr:  "127.0.0.1:10021",
+				DNodeClass: "tehu_tsi_002",         //if class is missing, receiver should look for the class from db
+				DNodeName:  "DN21",                 //if name is missing, receiver should look for the name from db
+				Ts:         time.Now().UnixMilli(), //timestamp of first sample
+				Idx:        idx,                    //序号， 用于辅助判断是否丢包
+				Session:    "",                     //会话标识
+				Mode:       0,                      //模式，对应DNode的Mode: 0-定时采样，1-事件触发，2-轮询
+				Sps:        20,                     //采样频率, 仅在Mode=0时有效
+				SampleLen:  1,                      //采样长度
+				DataList: []*msg.DMsgData{
+					&msg.DMsgData{
+						Offset:  0,
+						PtAlias: "温度",
+						Meta: &meta.DataMeta{
+							Dimen:     1,
+							ByteLen:   4,
+							DataClass: meta.DATA_CLASS_FLOAT,
+							Unit:      "C",
+							Msb:       true,
+						},
+						Data: make([]byte, 4),
+					},
+					&msg.DMsgData{
+						Offset:  1,
+						PtAlias: "湿度",
+						Meta: &meta.DataMeta{
+							Dimen:     1,
+							ByteLen:   2,
+							DataClass: meta.DATA_CLASS_INT16,
+							Unit:      "H",
+							Msb:       true,
+						},
+						Data: make([]byte, 2),
+					},
+				}, //offset as the key
+			}
+			tempVal := 25.0
+			humiVal := 70
+			binary.BigEndian.PutUint32(dmsg.DataList[0].Data, uint32(tempVal))
+			binary.BigEndian.PutUint16(dmsg.DataList[1].Data, uint16(humiVal))
+			dao.Insert(dmsg)
+			idx++
+		default:
+			time.Sleep(1 * time.Second)
+		}
 	}
 
-	dmsg.DataList = make(map[int]*msg.DMsgData)
-	dmsg.DataList[0] = &msg.DMsgData{
-		Meta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT32,
-			Dimen:     4,
-			SampleLen: 1,
-		},
-		Data: make([]byte, 4*4),
-	}
-
-	i := 0
-	for i < 4 {
-		binary.BigEndian.PutUint32(dmsg.DataList[0].Data[i*4:(i+1)*4], uint32(i))
-		i++
-	}
-
-	dao.Insert(dmsg)
-
-	sql := fmt.Sprintf("insert into dp_0_0 using dp tags(0,0,0) values(?, 1,2,3,4)")
-	dao.TaosCli.Exec(sql, dmsg.Ts)
 }
 
-func _task_dao_init(dao *dao.DpDao) {
-	dao.Open()
-	dao.InitTable(&model.DPoint{
-		DataMeta: &meta.DataMeta{
-			DataClass: meta.DATA_CLASS_INT32,
-			Dimen:     4,
-		},
-	})
+func _task_dao_init(dao *dao.DpDataDao) {
 
-	go _task_dao_query(dao)
-	// go _task_insert(dao)
+	template := &model.DNodeTemplate{
+		Id:   1,
+		Name: "tehu_tsi_002",
+		Template: &model.DNode{
+			Id:         0,
+			TemplateId: 0,
+			ParentId:   0,
+			Addr:       "0.0.0.0:8008",
+			Class:      "tehu_tsi_002",
+			Name:       "N21",
+			Descrip:    "Tehu sensor",
+			PropSet:    make(map[string]string),
+			DPointList: []*model.DPoint{
+				&model.DPoint{
+					Offset: 0,
+					Alias:  "",
+					Class:  "温度",
+					DataMeta: &meta.DataMeta{
+						ByteLen:   4,
+						Dimen:     1,
+						DataClass: meta.DATA_CLASS_FLOAT,
+						Unit:      "C",
+					},
+					Data: make([]byte, 4),
+				},
+				&model.DPoint{
+					Offset: 1,
+					Alias:  "",
+					Class:  "湿度",
+					DataMeta: &meta.DataMeta{
+						ByteLen:   2,
+						Dimen:     1,
+						DataClass: meta.DATA_CLASS_INT16,
+						Unit:      "%",
+					},
+					Data: make([]byte, 2),
+				},
+			},
+			State:     0,
+			Sps:       1000,
+			SampleLen: 1,
+			Mode:      model.DNODE_MODE_AUTO,
+		},
+	}
+	dao.Open()
+
+	res := dao.CreateTableFromTemplate(template)
+	if res < 0 {
+		ulog.Log().E("mock_taos", "Create table failed")
+	} else {
+		ulog.Log().I("mock_taos", "create table success")
+	}
+
+	// go _task_dao_query(dao)
+	go _task_insert(dao)
 }

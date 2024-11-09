@@ -162,7 +162,7 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, tehuNodeDao *i
 					ulog.Log().E("main", "th_node msg decode error: "+err.Error())
 				} else {
 					ulog.Log().I("main", fmt.Sprintf("Decoded dpMsg: %+v", dpMsg))
-					ulog.Log().I("main", fmt.Sprintf("DNodeId: %d, Offset: %d, DataSet: %+v", dpMsg.DNodeId, dpMsg.Offset, dpMsg.DataSet))
+					// ulog.Log().I("main", fmt.Sprintf("DNodeId: %d, Offset: %d, DataSet: %+v", dpMsg.DNodeId, dpMsg.Offset, dpMsg.DataSet))
 					//insert into taos
 					ulog.Log().I("main", "insert tehu_node msg: "+string(rxmsg.Data))
 					tehuNodeDao.Insert(dpMsg)

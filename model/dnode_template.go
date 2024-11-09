@@ -6,8 +6,7 @@ type DNodeTemplate struct {
 	Id   int64
 	Name string
 
-	Template    *DNode
-	ColNameList []string
+	Template *DNode
 }
 
 func (dnt *DNodeTemplate) Validate() bool {

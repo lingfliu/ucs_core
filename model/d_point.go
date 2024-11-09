@@ -6,7 +6,7 @@ import (
 
 type DPoint struct {
 	//1. 寻址， 2. 静态属性， 3. Node信息, 4. 数据
-	Id     int64  //(optional)
+	// Id     int64  //(optional)
 	Class  string //数据点位类别
 	Alias  string //数据点位别称
 	Offset int    //索引 (总线地址)

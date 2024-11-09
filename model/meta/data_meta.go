@@ -2,6 +2,8 @@ package meta
 
 import (
 	"encoding/binary"
+
+	"github.com/lingfliu/ucs_core/model/prop"
 )
 
 const (
@@ -26,8 +28,9 @@ const (
 type DataMeta struct {
 	ByteLen   int //1,2,4,8 only
 	Dimen     int
-	Alias     string //代号
-	Code      string //代码
+	ValAlias  []string //各个值的别名, should be ascii string < 16
+	RangeList []*prop.Range
+	Code      string //(reserved)
 	Unit      string //单位
 	DataClass int
 	Msb       bool

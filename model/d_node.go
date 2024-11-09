@@ -23,10 +23,10 @@ type DNode struct {
 	Name       string            //名称
 	Class      string            //节点型号
 	Descrip    string            //文字描述，辅助信息
-	PropSet    map[string]string //静态属性，string格式
+	PropSet    map[string]string //TODO: redefined as a struct
 	DPointList []*DPoint         //数据点位
 	State      int               //0-正常，1-告警，2-故障, 3-离线
 	Mode       int               //监测模式: 0-采样，1-事件触发，2-轮询
-	Sps        int64             //采样率 interval in ms: 同一个节点设备下的所有监测点位的采样频率一致
+	Sps        int64             //采样率 in ms, effective when sampleLen > 1
 	SampleLen  int               //采样长度
 }

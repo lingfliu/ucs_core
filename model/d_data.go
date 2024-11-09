@@ -17,7 +17,7 @@ type DnData struct {
 	Session   string
 	Sps       int64
 	SampleLen int
-	Pos       *gis.GPos //optional
+	Pos       []*gis.GPos //optional
 
 	DpDataList []*DpData
 }
@@ -25,5 +25,5 @@ type DnData struct {
 type DpData struct {
 	Offset   int
 	DataMeta *meta.DataMeta
-	Data     any
+	Data     []any //byteLen * dimen * sampleLen
 }

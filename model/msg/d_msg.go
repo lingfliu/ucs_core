@@ -16,18 +16,20 @@ const (
 )
 
 type DMsgData struct {
-	Offset int
-	Meta   *meta.DataMeta
-	Data   []byte
+	Offset  int
+	PtAlias string //if missing, receiver should look for the alias from db
+	Meta    *meta.DataMeta
+	Data    []byte // = byteLen * dimen * sampleLen
 }
 
 /**
  * 监测消息，每一个消息携带一个DNode所有点位的数据
  */
 type DMsg struct {
-	DNodeId    int64
+	DNodeId    int64 //should provide at least id / name / addr
 	DNodeAddr  string
-	DNodeClass string
+	DNodeClass string      //if class is missing, receiver should look for the class from db
+	DNodeName  string      //if name is missing, receiver should look for the name from db
 	Ts         int64       //timestamp of first sample
 	Idx        int         //序号， 用于辅助判断是否丢包
 	Session    string      //会话标识
