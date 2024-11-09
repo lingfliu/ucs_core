@@ -124,7 +124,7 @@ func (dao *TehuNodeDao) Insert(p *msg.DMsg) {
 	tableName := fmt.Sprintf("%s_%d_%d", stableName, p.DNodeId, p.Offset)
 	var temp, humi uint32
 	// 遍历 DataSet 以提取温度和湿度
-	for i, DMsgData := range p.DataSet {
+	for i, DMsgData := range p.DataList {
 		if DMsgData.Meta.Dimen == 1 {
 			value := binary.BigEndian.Uint32(DMsgData.Data[0:4])
 			if i == 0 {

@@ -63,8 +63,8 @@ func _task_insert(dao *dao.DpDao) {
 		Ts:      time.Now().UnixNano() / 1000000,
 	}
 
-	dmsg.DataSet = make(map[int]*msg.DMsgData)
-	dmsg.DataSet[0] = &msg.DMsgData{
+	dmsg.DataList = make(map[int]*msg.DMsgData)
+	dmsg.DataList[0] = &msg.DMsgData{
 		Meta: &meta.DataMeta{
 			DataClass: meta.DATA_CLASS_INT32,
 			Dimen:     4,
@@ -75,7 +75,7 @@ func _task_insert(dao *dao.DpDao) {
 
 	i := 0
 	for i < 4 {
-		binary.BigEndian.PutUint32(dmsg.DataSet[0].Data[i*4:(i+1)*4], uint32(i))
+		binary.BigEndian.PutUint32(dmsg.DataList[0].Data[i*4:(i+1)*4], uint32(i))
 		i++
 	}
 

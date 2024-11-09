@@ -18,3 +18,12 @@ type Mach struct {
 	CtlNodeList []*CtlNode
 	CamList     []*Cam
 }
+
+func (mach *Mach) hasDNode(nodeId int64) bool {
+	for _, node := range mach.DNodeList {
+		if node.Id == nodeId {
+			return true
+		}
+	}
+	return false
+}

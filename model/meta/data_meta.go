@@ -26,7 +26,6 @@ const (
 type DataMeta struct {
 	ByteLen   int //1,2,4,8 only
 	Dimen     int
-	SampleLen int
 	Alias     string //代号
 	Code      string //代码
 	Unit      string //单位
@@ -34,9 +33,8 @@ type DataMeta struct {
 	Msb       bool
 }
 
-func byteAsInt8(bs []byte, meta *DataMeta) [][]int8 {
+func byteAsInt8(bs []byte, meta *DataMeta, sampleLen int) [][]int8 {
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]int8, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]int8, dimen)
@@ -48,9 +46,8 @@ func byteAsInt8(bs []byte, meta *DataMeta) [][]int8 {
 	return converted
 }
 
-func byteAsUint8(bs []byte, meta *DataMeta) [][]uint8 {
+func byteAsUint8(bs []byte, meta *DataMeta, sampleLen int) [][]uint8 {
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]uint8, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]uint8, dimen)
@@ -62,10 +59,9 @@ func byteAsUint8(bs []byte, meta *DataMeta) [][]uint8 {
 	return converted
 }
 
-func byteAsInt16(bs []byte, meta *DataMeta) [][]int16 {
+func byteAsInt16(bs []byte, meta *DataMeta, sampleLen int) [][]int16 {
 	byteLen := meta.ByteLen
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]int16, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]int16, dimen)
@@ -81,10 +77,9 @@ func byteAsInt16(bs []byte, meta *DataMeta) [][]int16 {
 	return converted
 }
 
-func byteAsUint16(bs []byte, meta *DataMeta) [][]uint16 {
+func byteAsUint16(bs []byte, meta *DataMeta, sampleLen int) [][]uint16 {
 	byteLen := meta.ByteLen
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]uint16, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]uint16, dimen)
@@ -100,11 +95,10 @@ func byteAsUint16(bs []byte, meta *DataMeta) [][]uint16 {
 	return converted
 }
 
-func byteAsInt32(bs []byte, meta *DataMeta) [][]int32 {
+func byteAsInt32(bs []byte, meta *DataMeta, sampleLen int) [][]int32 {
 	//TODO: if byteLen != 4, return nill
 	byteLen := 4
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]int32, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]int32, dimen)
@@ -120,10 +114,9 @@ func byteAsInt32(bs []byte, meta *DataMeta) [][]int32 {
 	return converted
 }
 
-func byteAsUint32(bs []byte, meta *DataMeta) [][]uint32 {
+func byteAsUint32(bs []byte, meta *DataMeta, sampleLen int) [][]uint32 {
 	byteLen := 4
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]uint32, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]uint32, dimen)
@@ -139,11 +132,10 @@ func byteAsUint32(bs []byte, meta *DataMeta) [][]uint32 {
 	return converted
 }
 
-func byteAsInt64(bs []byte, meta *DataMeta) [][]int64 {
+func byteAsInt64(bs []byte, meta *DataMeta, sampleLen int) [][]int64 {
 	//TODO: if byteLen != 8, return null
 	byteLen := 8
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]int64, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]int64, dimen)
@@ -159,10 +151,9 @@ func byteAsInt64(bs []byte, meta *DataMeta) [][]int64 {
 	return converted
 }
 
-func byteAsUint64(bs []byte, meta *DataMeta) [][]uint64 {
+func byteAsUint64(bs []byte, meta *DataMeta, sampleLen int) [][]uint64 {
 	byteLen := 4
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]uint64, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]uint64, dimen)
@@ -177,10 +168,9 @@ func byteAsUint64(bs []byte, meta *DataMeta) [][]uint64 {
 	return converted
 }
 
-func byteAsFloat(bs []byte, meta *DataMeta) [][]float32 {
+func byteAsFloat(bs []byte, meta *DataMeta, sampleLen int) [][]float32 {
 	byteLen := 4
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]float32, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]float32, dimen)
@@ -196,10 +186,9 @@ func byteAsFloat(bs []byte, meta *DataMeta) [][]float32 {
 
 }
 
-func byteAsDouble(bs []byte, meta *DataMeta) [][]float64 {
+func byteAsDouble(bs []byte, meta *DataMeta, sampleLen int) [][]float64 {
 	byteLen := 8
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]float64, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]float64, dimen)
@@ -214,9 +203,8 @@ func byteAsDouble(bs []byte, meta *DataMeta) [][]float64 {
 	return converted
 }
 
-func byteAsFlag(bs []byte, meta *DataMeta) [][]bool {
+func byteAsFlag(bs []byte, meta *DataMeta, sampleLen int) [][]bool {
 	dimen := meta.Dimen
-	sampleLen := meta.SampleLen
 	converted := make([][]bool, sampleLen)
 	for i := 0; i < sampleLen; i++ {
 		converted[i] = make([]bool, dimen)

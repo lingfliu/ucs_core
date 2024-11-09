@@ -78,6 +78,7 @@ func (cli *TaosCli) ShowSTables() []string {
 	}
 	return stableList
 }
+
 func (cli *TaosCli) ShowTables() []string {
 	tableList := make([]string, 0)
 	rows, err := cli.taos.Query("show tables")
@@ -111,8 +112,8 @@ func (cli *TaosCli) Exec(sql string, args ...any) int {
 	}
 }
 
-func (cli *TaosCli) Query(sql string) *sql.Rows {
-	rows, err := cli.taos.Query(sql)
+func (cli *TaosCli) Query(sql string, args ...any) *sql.Rows {
+	rows, err := cli.taos.Query(sql, args...)
 	if err != nil {
 		ulog.Log().E("taos", fmt.Sprintf("failed to query %s, err: "+err.Error(), sql))
 		return nil
@@ -120,12 +121,10 @@ func (cli *TaosCli) Query(sql string) *sql.Rows {
 	return rows
 }
 
-//TODO: improve this
 func (cli *TaosCli) CreateSTable(stableName string, columns string, tag_columns string) {
 	cli.taos.Exec(fmt.Sprintf("create stable if not exist %s.%s(%s) tags(%s)", cli.DbName, stableName, columns, tag_columns))
 }
 
-//TODO: improve this
 func (cli *TaosCli) CreateTable(tableName string, stableName string, tags []string) {
 	tagStr := ""
 	tagStr += tags[0]
@@ -133,40 +132,4 @@ func (cli *TaosCli) CreateTable(tableName string, stableName string, tags []stri
 		tagStr += tags[i] + ","
 	}
 	cli.taos.Exec(fmt.Sprintf("create table if not exist %s using %s.%s tags(%s)", tableName, cli.DbName, stableName, tagStr))
-}
-
-//TODO: improve this
-func (cli *TaosCli) Insert(tableName string, columns []string, tags []string) {
-	columnStr := ""
-	for _, column := range columns {
-		columnStr += column + " "
-	}
-	tagStr := ""
-	for _, tag := range tags {
-		tagStr += tag + " "
-	}
-	cli.taos.Exec(fmt.Sprintf("insert into %s values(%s) tags(%s)", tableName, columnStr, tagStr))
-}
-
-//TODO: improve this
-func (cli *TaosCli) QueryAll(dbName string, tableName string) {
-	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s", dbName, tableName))
-	if err != nil {
-		ulog.Log().E("taos", "failed to query taos")
-	}
-	defer rows.Close()
-}
-
-//TODO: improve this
-func (cli *TaosCli) QueryByTime(tableName string, tic string, toc string) {
-
-	rows, err := cli.taos.Query(fmt.Sprintf("select * from %s.%s where ts<%s and ts > %s", cli.DbName, tableName, tic, toc))
-	if err != nil {
-		ulog.Log().E("taos", "failed to query taos")
-	}
-	defer rows.Close()
-}
-
-func (cli *TaosCli) DeleteById(dbName string, tableName string, id string) {
-	cli.taos.Exec(fmt.Sprintf("delete from %s.%s where id=%s", dbName, tableName, id))
 }

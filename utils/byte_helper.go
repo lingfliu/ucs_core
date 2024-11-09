@@ -196,3 +196,23 @@ func String2Byte(s string, bs []byte, offset int, strlen int) {
 func Byte2String(bs []byte, offset int, strlen int) string {
 	return string(bs[offset : offset+strlen])
 }
+
+/**
+ * @l length
+ */
+func Byte2Int16(bs []byte, msb bool) []int16 {
+	valueList := make([]int16, len(bs)/2)
+	if msb {
+		//convert byte array to int16 array
+		for i := 0; i < len(valueList); i++ {
+			valueList[i] = int16(binary.BigEndian.Uint16(bs[i*2 : (i+1)*2]))
+		}
+	} else {
+		//convert byte array to int16 array
+		for i := 0; i < len(valueList); i++ {
+			valueList[i] = int16(binary.LittleEndian.Uint16(bs[i*2 : (i+1)*2]))
+		}
+	}
+
+	return valueList
+}

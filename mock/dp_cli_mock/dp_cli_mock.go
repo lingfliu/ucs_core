@@ -99,7 +99,7 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 				Mode:    0,
 				DNodeId: dnode.Id,
 				//random int32
-				DataSet: make(map[int]*msg.DMsgData),
+				DataList: make(map[int]*msg.DMsgData),
 			}
 
 			for i := 0; i < dnode.NoDp; i++ {
@@ -110,7 +110,7 @@ func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 					v := utils.RandInt32(0, 10000)
 					binary.BigEndian.PutUint32(valueList[i*4:(i+1)*4], uint32(v))
 				}
-				dmsg.DataSet[i] = &msg.DMsgData{
+				dmsg.DataList[i] = &msg.DMsgData{
 					Meta: &meta.DataMeta{
 						Dimen:     DATA_DIMEN,
 						SampleLen: 1,
