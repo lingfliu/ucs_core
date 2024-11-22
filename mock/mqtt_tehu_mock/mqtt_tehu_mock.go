@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/lingfliu/ucs_core/dao"
-	"github.com/lingfliu/ucs_core/dao/impl"
 	"github.com/lingfliu/ucs_core/data/rtdb"
 	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/model"
+	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
 
 	//"github.com/lingfliu/ucs_core/model/spec"
@@ -60,50 +60,16 @@ func main() {
 	fmt.Println("MQTT client started")
 
 	//config taos
-	taosCli := rtdb.NewTaosCli(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
-	log.Println("Opening database connection...")
-	taosCli.Open()
-
-	// 实例化 TehuNodeDao
-	template := model.DPoint{}
-	colNameList := []string{"temp", "humi"}
-	dpDao := &dao.DpDao{
-		TaosCli:     taosCli,
-		Template:    &template,
-		ColNameList: colNameList,
-	}
-	tehuNodeDao := &impl.TehuNodeDao{
-		DpDao: *dpDao,
-	}
-	fmt.Printf("TehuNodeDao created: %+v\n", tehuNodeDao)
-
-	node := tehuNodeDao.GenerateTemplate()
-	fmt.Printf("Generated node: %+v\n", node)
-
-	// 调用 Create 函数
-	res := tehuNodeDao.Create()
-	if res < 0 {
-		log.Println("Failed to create stable.")
-	} else {
-		log.Println("Stable created successfully.")
-		defer dpDao.TaosCli.Close() // 确保在退出时关闭连接
-	}
-	//调用 TableExist 方法
-	exists := tehuNodeDao.TableExist()
-	if exists {
-		fmt.Println("所有表存在")
-	} else {
-		fmt.Println("有表不存在")
-	}
+	dpDataDao := dao.NewDpDataDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
+	fmt.Println("Opening database connection...")
+	go _task_dao_init(dpDataDao)
 
 	sigRun, cancelRun := context.WithCancel(context.Background())
 	go _task_mqtt_io(sigRun, mqttCli)
+	go _task_recv_mqtt(sigRun, mqttCli, dpDataDao)
+	go _task_dao_query(dpDataDao)
+	go _task_dao_AggrQuery(dpDataDao)
 
-	fmt.Println("========= MQTT 客户端连接成功===============")
-
-	go _task_recv_mqtt(sigRun, mqttCli, tehuNodeDao)
-
-	//等待退出信号，并在收到信号时断开连接
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
 	for {
@@ -111,11 +77,69 @@ func main() {
 		case <-s:
 			cancelRun()
 			mqttCli.Stop()
-			dpDao.Close()
+			dpDataDao.Close()
 			return
 		default:
 			time.Sleep(1 * time.Second)
 		}
+	}
+}
+func _task_dao_query(dao *dao.DpDataDao) {
+	ulog.Log().I("main", "Starting _task_dao_query")
+	tic := "2024-11-01 00:00:00.000"
+	toc := "2024-11-30 00:00:00.000"
+
+	ulog.Log().I("main", fmt.Sprintf("Querying data from %s to %s", tic, toc))
+	tsList, dpData := dao.Query(tic, toc, "tehu_tsi_001", 0, 0, 100, 0, &meta.DataMeta{
+		Dimen:   1,
+		ByteLen: 4,
+	})
+
+	if len(tsList) == 0 || len(dpData.Data) == 0 {
+		ulog.Log().I("main", "No data returned from query")
+		return
+	}
+
+	for i, ts := range tsList {
+		val := dpData.Data[i].([]any)[0].(float32)
+		ulog.Log().I("main", fmt.Sprintf("ts: %d, %f", ts, val))
+	}
+
+}
+
+func _task_dao_AggrQuery(dao *dao.DpDataDao) {
+	ulog.Log().I("main", "Starting _task_dao_AggrQuery")
+
+	tic := "2024-11-01 00:00:00.000"
+	toc := "2024-11-30 00:00:00.000"
+	windowMinutes := int64(10)          // 时间窗口，单位：分钟
+	stepMinutes := int64(5)             // 步长，单位：分钟
+	window := windowMinutes * 60 * 1000 // 转换为毫秒
+	step := stepMinutes * 60 * 1000     // 转换为毫秒
+	ops := []int{
+		rtdb.TAOS_AGGR_AVG, // 平均值
+		rtdb.TAOS_AGGR_MAX, // 最大值
+	}
+
+	ulog.Log().I("main", fmt.Sprintf("AggrQuery data between %s and %s interval(%d) sliding(%d)", tic, toc, window, step))
+	tsList, dpData := dao.AggrQuery(tic, toc, "tehu_tsi_001", 0, 0, 0, &meta.DataMeta{
+		Dimen:    1,
+		ByteLen:  4,
+		ValAlias: []string{"Temperature"},
+	}, window, step, ops)
+
+	if len(tsList) == 0 || len(dpData.Data) == 0 {
+		ulog.Log().I("main", "No data returned from aggregate query")
+		return
+	}
+
+	for i, ts := range tsList {
+		ulog.Log().I("main", fmt.Sprintf("dpData.Data[%d]: %v", i, dpData.Data[i]))
+		vals := dpData.Data[i].([]float32)
+		avg := vals[0] // 平均值
+		max := vals[1] // 最大值
+
+		ulog.Log().I("main", fmt.Sprintf("ts: %d, avg: %f, max: %f", ts, avg, max))
 	}
 }
 
@@ -130,8 +154,67 @@ func _task_mqtt_io(sigRun context.Context, mqttCli *dd.MqttCli) {
 	}
 }
 
-func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, tehuNodeDao *impl.TehuNodeDao) {
-	//Subscribe( mqtt message
+func _task_dao_init(dao *dao.DpDataDao) {
+
+	template := &model.DNodeTemplate{
+		Id:   1,
+		Name: "tehu_tsi_001",
+		Template: &model.DNode{
+			Id:         0,
+			TemplateId: 0,
+			ParentId:   0,
+			Addr:       "0.0.0.0:8008",
+			Class:      "tehu_tsi_001",
+			Name:       "N20",
+			Descrip:    "Tehu sensor",
+			PropSet:    make(map[string]string),
+			DPointList: []*model.DPoint{
+				&model.DPoint{
+					Offset: 0,
+					Alias:  "Temperature",
+					Class:  "温度",
+					DataMeta: &meta.DataMeta{
+						ByteLen:   4,
+						Dimen:     1,
+						DataClass: meta.DATA_CLASS_FLOAT,
+						Unit:      "°C",
+						ValAlias:  []string{"Temperature"},
+						Msb:       true,
+					},
+					Data: make([]byte, 4),
+				},
+				&model.DPoint{
+					Offset: 1,
+					Alias:  "Humidity",
+					Class:  "湿度",
+					DataMeta: &meta.DataMeta{
+						ByteLen:   2,
+						Dimen:     1,
+						DataClass: meta.DATA_CLASS_INT16,
+						Unit:      "%",
+						ValAlias:  []string{"Humidity"},
+						Msb:       true,
+					},
+					Data: make([]byte, 2),
+				},
+			},
+			State:     0,
+			Sps:       20,
+			SampleLen: 2,
+			Mode:      model.DNODE_MODE_AUTO,
+		},
+	}
+	dao.Open()
+
+	res := dao.CreateTableFromTemplate(template)
+	if res < 0 {
+		ulog.Log().E("mock_taos", "Create stable failed")
+	} else {
+		ulog.Log().I("mock_taos", "create stable success")
+	}
+}
+
+func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, dpDataDao *dao.DpDataDao) {
 	for _, topic := range mqttCfg.TopicList {
 		if result := mqttCli.Subscribe(topic); result != 0 {
 			log.Println("Failed to subscribe to topic:", topic)
@@ -139,7 +222,6 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, tehuNodeDao *i
 			log.Println("Successfully subscribed to topic:", topic)
 		}
 	}
-	// Add a ticker for logging if no messages are received
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -149,24 +231,18 @@ func _task_recv_mqtt(sigRun context.Context, mqttCli *dd.MqttCli, tehuNodeDao *i
 			fmt.Println("Signal received, terminating loop.")
 			return
 		case rxmsg := <-mqttCli.RxMsg:
-			fmt.Println("=========接收MQTT消息=================")
+			fmt.Println("=================接收MQTT消息=================")
 			fmt.Printf("Received message on topic: " + rxmsg.Topic + ", Data: " + string(rxmsg.Data))
-			//ulog.Log().I("main", "Received message on topic: "+rxmsg.Topic+", Data: "+string(rxmsg.Data))
-			//parse mqtt message
 			switch rxmsg.Topic {
 			case "ucs/dd/tehu_node":
-				//payload is encoded by DpCoder: [ts, dnode id, dp offsetidx, int value]
 				dpMsg := &msg.DMsg{}
 				err := json.Unmarshal(rxmsg.Data, dpMsg)
 				if err != nil {
-					ulog.Log().E("main", "th_node msg decode error: "+err.Error())
+					ulog.Log().E("main", "tehu_node msg decode error: "+err.Error())
 				} else {
 					ulog.Log().I("main", fmt.Sprintf("Decoded dpMsg: %+v", dpMsg))
-					// ulog.Log().I("main", fmt.Sprintf("DNodeId: %d, Offset: %d, DataSet: %+v", dpMsg.DNodeId, dpMsg.Offset, dpMsg.DataSet))
-					//insert into taos
 					ulog.Log().I("main", "insert tehu_node msg: "+string(rxmsg.Data))
-					tehuNodeDao.Insert(dpMsg)
-					//dpDao.Insert(dpMsg)
+					dpDataDao.Insert(dpMsg)
 				}
 			default:
 				log.Printf("Message received on unexpected topic: %s, Data: %s", rxmsg.Topic, string(rxmsg.Data))
