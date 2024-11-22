@@ -23,8 +23,9 @@ const (
 	MQTT_USERNAME = "admin"
 	MQTT_PASSWORD = "admin1234"
 
-	DATA_DIMEN   = 1
-	DATA_BYTELEN = 4 //int16
+	DATA_DIMEN     = 1
+	DATA_BYTELEN   = 4
+	DATA_SAMPLELEN = 1
 )
 
 type DNodeMock struct {
@@ -88,90 +89,77 @@ func _task_cancel(ctlRunList []context.CancelFunc) {
 
 func _task_mock_mqtt(sigRun context.Context, dnode *DNodeMock) {
 	dnode.Cli.Start()
-	tic := time.NewTicker(5 * time.Second) //每5秒生成一次数据
-
-	// go func() {
-	// 	dnode.Cli.Subscribe(MQTT_TOPIC)
-	// }()
+	tic := time.NewTicker(5 * time.Second) // 每 5 秒生成一次数据
+	defer tic.Stop()
 
 	for {
 		select {
 		case <-sigRun.Done():
+			ulog.Log().I("mock", "task is canceled, stopping publish")
 			dnode.Cli.Stop()
+			return
 		case <-tic.C:
 			if sigRun.Err() != nil {
 				ulog.Log().I("mock", "task is canceled, stopping publish")
 				return
 			}
-			for i := 0; i < dnode.NoDp; i++ {
-				//模拟部分：NoDp=2, sampleLen=1，dimen=1，bytelen=4， MSB，随机数据
-				dmsg := &msg.DMsg{
-					Ts:      time.Now().UnixNano() / 1e6, //当前时间戳，单位为毫秒
-					Sps:     100 * 1000 * 1000,           //采样率
-					Mode:    0,                           //0-定时采样，1-事件触发，2-轮询
-					DNodeId: dnode.Id,                    // 节点ID
-					DataSet: make(map[int]*msg.DMsgData),
-				}
 
-				valueList := make([]byte, dnode.DpDimen*4)
-				if i == 0 {
-					// 模拟生成温度数据 (维度0)
-					temp := utils.RandInt32(0, 50)                              // 随机生成温度范围0°C到50°C
-					binary.BigEndian.PutUint32(valueList[0:4], uint32(temp))    // 将温度值放入第0个维度
-					ulog.Log().I("mock", fmt.Sprintf("publish temp: %d", temp)) // 打印温度值
-
-					dmsg.Offset = 0
-					dmsg.DataSet[dmsg.Offset] = &msg.DMsgData{
+			dmsg := &msg.DMsg{
+				DNodeId:    dnode.Id,               // 节点ID
+				DNodeAddr:  "127.0.0.1:10021",      // 节点地址
+				DNodeClass: "tehu_tsi_001",         // 节点类型
+				DNodeName:  "DN20",                 // 节点名称
+				Ts:         time.Now().UnixMilli(), // 当前时间戳（毫秒）
+				Idx:        0,                      // 序号
+				Session:    "",                     // 会话标识
+				Mode:       0,                      // 模式
+				Sps:        20,                     // 采样频率
+				SampleLen:  DATA_SAMPLELEN,         // 采样长度
+				DataList: []*msg.DMsgData{
+					{
+						Offset:  0,
+						PtAlias: "温度",
 						Meta: &meta.DataMeta{
-							Dimen:     1, // 维度
-							SampleLen: 1, // 采样长度
-							ByteLen:   4, // uint32 占用 4 字节
-							DataClass: meta.DATA_CLASS_INT,
-							Alias:     "Temperature",
+							Dimen:     DATA_DIMEN,
+							ByteLen:   4,
+							ValAlias:  []string{"Temperature"},
+							DataClass: meta.DATA_CLASS_FLOAT,
 							Unit:      "°C",
+							Msb:       true,
 						},
-						Data: valueList,
-					}
-
-				} else if i == 1 {
-					// 模拟生成湿度数据 (维度1)
-					humi := utils.RandInt32(20, 70)                             // 随机生成湿度范围20%到70%
-					binary.BigEndian.PutUint32(valueList[0:4], uint32(humi))    // 将湿度值放入第1个维度
-					ulog.Log().I("mock", fmt.Sprintf("publish humi: %d", humi)) // 打印湿度值
-
-					dmsg.Offset = 1
-					dmsg.DataSet[dmsg.Offset] = &msg.DMsgData{
+						Data: make([]byte, 4),
+					},
+					{
+						Offset:  1,
+						PtAlias: "湿度",
 						Meta: &meta.DataMeta{
-							Dimen:     DATA_DIMEN, //1
-							SampleLen: 1,
-							ByteLen:   DATA_BYTELEN, // uint32 占用 4 字节
-							DataClass: meta.DATA_CLASS_INT,
-							Alias:     "Humidity",
+							Dimen:     DATA_DIMEN,
+							ByteLen:   2,
+							ValAlias:  []string{"Humidity"},
+							DataClass: meta.DATA_CLASS_INT16,
 							Unit:      "%",
+							Msb:       true,
 						},
-						Data: valueList,
-					}
-					//指定维度，不用循环
-					// for i := 0; i < dnode.DpDimen; i++ {
-					// 	//random int32
-					// 	v := utils.RandInt32(0, 10000)
-					// 	binary.BigEndian.PutUint32(valueList[i*4:(i+1)*4], uint32(v))
-					// 	// 打印温湿度值
-					// 	ulog.Log().I("mock", fmt.Sprintf("publish temp and humi: %d", uint32(v)))
-					// }
-
-				}
-				// 将数据转换为 JSON 并发布到 MQTT
-				bytes, err := json.Marshal(dmsg)
-				if err != nil {
-					ulog.Log().E("mock", "failed to marshal ddMsg, err: "+err.Error())
-					continue
-				}
-				ulog.Log().I("mock", "------------------>publish tehu msg: "+string(bytes))
-				dnode.Cli.Publish(MQTT_TOPIC, bytes)
-				//fmt.Println("Publishing to MQTT topic: ucs/dd/th_node, Data:", bytes)
-
+						Data: make([]byte, 2),
+					},
+				},
 			}
+
+			// 随机生成温度和湿度数据
+			tempVal := utils.RandFloat32(0.0, 35.0)
+			humiVal := utils.RandInt32(20, 80)
+			binary.BigEndian.PutUint32(dmsg.DataList[0].Data, uint32(tempVal))
+			binary.BigEndian.PutUint16(dmsg.DataList[1].Data, uint16(humiVal))
+			ulog.Log().I("mock", fmt.Sprintf("Generated temp: %.2f°C, humi: %d%%", tempVal, humiVal))
+
+			// 将数据转换为 JSON 并发布到 MQTT
+			bytes, err := json.Marshal(dmsg)
+			if err != nil {
+				ulog.Log().E("mock", "failed to marshal dmsg, err: "+err.Error())
+				continue
+			}
+			ulog.Log().I("mock", "------------------> publish tehu msg: "+string(bytes))
+			dnode.Cli.Publish(MQTT_TOPIC, bytes)
 		}
 	}
 }

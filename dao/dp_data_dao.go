@@ -69,8 +69,8 @@ func (dao *DpDataDao) CreateTableFromTemplate(template *model.DNodeTemplate) int
 			tdType = "int unsigned"
 		} else if dataClass == meta.DATA_CLASS_INT64 {
 			tdType = "bigint"
-		} else if dataClass == meta.DATA_CLASS_INT64 {
-			tdType = "bigint unsigned"
+			// } else if dataClass == meta.DATA_CLASS_INT64 {
+			// 	tdType = "bigint unsigned"
 		} else if dataClass == meta.DATA_CLASS_FLOAT {
 			tdType = "float"
 		} else if dataClass == meta.DATA_CLASS_DOUBLE {
@@ -211,8 +211,8 @@ func (dao *DpDataDao) Query(tic string, toc string, dnodeClass string, dnodeId i
 	toc_time, _ := time.Parse("2006-01-02 15:04:05.000", toc)
 	toc_ms := toc_time.UnixMilli()
 
-	tableName := CreateSTableName(dnodeClass, dpointOffset)
-	sql := fmt.Sprintf("select * from %s where ts between %d and %d and dnode_id = %d and dpoint_offset = %d limit %d offset %d", tableName, tic_ms, toc_ms, dnodeId, dpointOffset, limit, offset)
+	stableName := CreateSTableName(dnodeClass, dpointOffset)
+	sql := fmt.Sprintf("select * from %s where ts between %d and %d and dnode_id = %d and dpoint_offset = %d limit %d offset %d", stableName, tic_ms, toc_ms, dnodeId, dpointOffset, limit, offset)
 	rows := dao.TaosCli.Query(sql)
 	if rows == nil {
 		ulog.Log().E("dpdao", "failed to query dp")
@@ -275,7 +275,7 @@ func (dao *DpDataDao) AggrQuery(tic string, toc string, dnodeClass string, dnode
 	tic_ms := tic_time.UnixMilli()
 	toc_time, _ := time.Parse("2006-01-02 15:04:05.000", toc)
 	toc_ms := toc_time.UnixMilli()
-	tableName := CreateSTableName(dnodeClass, offset)
+	stableName := CreateSTableName(dnodeClass, offset)
 
 	var opCodes []string
 	for _, op := range ops {
@@ -292,12 +292,13 @@ func (dao *DpDataDao) AggrQuery(tic string, toc string, dnodeClass string, dnode
 	for _, op := range opCodes {
 		colStr += fmt.Sprintf("%s(%s),", op, colName)
 	}
+	// for i := 0; i < dataMeta.Dimen; i++ {
+	// 	colStr += fmt.Sprintf("%s(v%d)", opCodes[i], i)
+	// }
+	colStr = colStr[:len(colStr)-1]
+	ulog.Log().I("main", fmt.Sprintf("Generated column name: %s", colName))
 
-	for i := 0; i < dataMeta.Dimen; i++ {
-		colStr += fmt.Sprintf("%s(v%d)", opCodes[i], i)
-	}
-
-	sql := fmt.Sprintf("select _wstart, _wend, %s from %s where ts between %d and %d interval(%s) sliding(%s)", colStr, tableName, tic_ms, toc_ms, window, step)
+	sql := fmt.Sprintf("select _wstart, _wend, %s from %s where ts between %d and %d interval(%d) sliding(%d)", colStr, stableName, tic_ms, toc_ms, window, step)
 	rows := dao.TaosCli.Query(sql)
 	tsList := make([]int64, 0)
 	aggrList := make([]any, 0)
@@ -307,18 +308,23 @@ func (dao *DpDataDao) AggrQuery(tic string, toc string, dnodeClass string, dnode
 		defer rows.Close()
 		for rows.Next() {
 			//read data
-			var tStart int64
-			var tEnd int64
-			data := make([]float64, len(opCodes))
+			var tStartTime, tEndTime time.Time
+			data := make([]float32, len(opCodes))
 			scanned := make([]any, len(opCodes)+2)
-			scanned[0] = &tStart
-			scanned[1] = &tEnd
-			for i := 0; i < len(opCodes); i++ {
-				scanned[i+2] = &data[i]
+			scanned[0] = &tStartTime
+			scanned[1] = &tEndTime
+			for i := range data {
+				scanned[2+i] = &data[i] // 为每列分配指针
 			}
-			rows.Scan(scanned)
+			if err := rows.Scan(scanned...); err != nil {
+				ulog.Log().E("main", fmt.Sprintf("Error scanning row: %v", err))
+				continue
+			}
+			tStart := tStartTime.UnixMilli()
+			tEnd := tEndTime.UnixMilli()
 			tsList = append(tsList, tStart)
 			aggrList = append(aggrList, data)
+			ulog.Log().I("main", fmt.Sprintf("Parsed Row: tStart=%d, tEnd=%d, data=%+v", tStart, tEnd, data))
 		}
 	}
 
