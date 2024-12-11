@@ -13,15 +13,23 @@ extern "C" {
 	
     const int32_t Step = 0;
     const agibool removed = agitrue;//是否移除记录集
-    const agibool overwrite = agifalse;//添加点位遇到tag相同的点是否覆盖
+    const agibool Isoverwrite = agitrue;//添加点位遇到tag相同的点是否覆盖
+    const char* device_name="DV1";
+    const char* server = "Agilor";
 
     typedef struct {
         long long id;
         int64_t node_id;
         char descrip[32];
         char tag[64];
-        void* pt_value;
+        union {                               // 点值
+         float rval;                  // 浮点
+         int32_t lval;                    // 长整
+         bool bval;                  // 开关
+         char sval[128];  // 字符串
+       };
         int64_t ts;
+        int32_t v_type;
     } ucs_pt_t;
 
 //////////////////////////////////////////////
@@ -69,7 +77,8 @@ extern "C" {
 //////////////////////////////////////////////
     agilor_point_t ucsptToAgilorPt(ucs_pt_t* p);//ucs_pt_t转换
     agilor_value_t ucsptToAgilorValue(ucs_pt_t* p);
-    void getServer(char* server);//获取服务器名
+    ucs_pt_t agilorPtToucspt(agilor_value_t *value);
+    char ucsTypeToagiType(int32_t type);//go中的Type字段对应到agilor中的类型字段
     void agilor_ucs_pt_create(ucs_pt_t* p); //创建一个ucs点位
     void agilor_ucs_pt_drop(ucs_pt_t* p); //删除一个ucs点位
     void agilor_ucs_pt_insert(ucs_pt_t* p); //插入一个ucs点位值

@@ -226,9 +226,9 @@ agibool c_Agda_GetSubscribeValue(char* server, char* tag, agilor_value_t* value)
 agibool c_Agda_NextValue(agirecordset recordset, char* tag, agilor_value_t* value, agibool removed) {
     agibool result = Agda_NextValue(recordset, tag, value, removed);
     if (result == true) {
-        printf("成功枚举历史数据\n");
+        printf("成功枚举数据\n");
     } else {
-        printf("枚举失败\n");
+        printf("枚举结束\n");
     }
     return result;
 }
@@ -786,71 +786,157 @@ int32_t c_Agar_Unregister(const char* server, const char* device_name){
 ///////////////////////////////////////////////
 /////////////New function//////////////////
 /////////////////////////////////////////////
+
+char ucsTypeToagiType(int32_t v_type){
+    switch (v_type) {
+        case 9:
+            return 'R'; // 浮点数
+        case 0:
+            return 'S'; // 字符串
+        case 11:
+            return 'B'; // 开关(bool)
+        case 5:
+            return 'L'; // 整形
+        default:
+            return '\0';
+    }
+}
+
+int32_t agiTypeToucsType( char type){
+    switch (type) {
+        case 'R':
+            return 9; // 浮点数
+        case'S':
+            return 0; // 字符串
+        case 'B':
+            return 11; // 开关(bool)
+        case 'L':
+            return 5; // 整形
+        default:
+            return '\0';
+    }
+}
+
+ucs_pt_t agilorPtToucspt(agilor_value_t* value){
+
+//这里由于value没有tag字段tag需要在后面补上
+         ucs_pt_t  pt;
+         pt.ts = value->timedate;
+         pt.v_type = agiTypeToucsType(value->type);
+	switch(value->type){
+	case 'R':
+	pt.rval = value->rval;
+	break;
+	case 'S':
+                strncpy(pt.sval, value->sval, sizeof(pt.sval)-1);
+                pt.sval[sizeof(pt.sval) - 1] = '\0';  
+	break;
+	case 'B':
+	pt.bval= value->bval;
+	break;
+	case 'L':
+	pt.lval= value->lval;
+	break;
+	}    
+       return pt;    
+}
+
 agilor_point_t ucsptToAgilorPt(ucs_pt_t* p){
     agilor_point_t pt = {};
-    strncpy(pt.tag, p->tag, sizeof(pt.tag));
+    strncpy(pt.tag, p->tag, sizeof(pt.tag)-1);
     pt.tag[sizeof(pt.tag) - 1] = '\0';  
-    strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
+    strncpy(pt.point_source, device_name,sizeof(pt.point_source) - 1);
     pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
     strncpy(pt.source_tag, p->tag, sizeof(pt.source_tag) - 1);
-    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
-    pt.type = 'R';
- 
+    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';
+    pt.timedate = p->ts;
+    pt.scan = 1;
+    pt.archive = agitrue;
+    pt.type = ucsTypeToagiType(p->v_type);
     return pt;
 }
    
 agilor_value_t ucsptToAgilorValue(ucs_pt_t* p){
     agilor_value_t value = {};
+    value.type = ucsTypeToagiType(p->v_type);
     value.timedate = p->ts;
-
-    float *ptvalue = (float *)p->pt_value;
-
-    value.rval = *ptvalue;
-    value.type = 'R';
+    switch(value.type){
+        case 'R':
+        value.rval =p->rval;
+        break;
+        case 'S':
+        strncpy(value.sval, p->sval, sizeof(value.sval)-1);
+        value.sval[sizeof(value.sval) - 1] = '\0';  
+        break;
+        case 'B':
+        value.bval =p->bval;
+        break;
+        case 'L':
+        value.lval  = p->lval;
+        break;
+    }
     return value;
 }
 
 void agilor_ucs_pt_create(ucs_pt_t* p) {
-    //agilor_point_t  pt = ucsptToAgilorPt(p);
-    agilor_point_t pt = {};
-    pt.type = 'R';
-    strncpy(pt.tag, p->tag, sizeof(pt.tag) - 1);
-    pt.tag[sizeof(pt.tag) - 1] = '\0'; 
-    strncpy(pt.point_source, "DV2",sizeof(pt.point_source) - 1);
-    pt.point_source[sizeof(pt.point_source) - 1] = '\0'; 
-    strncpy(pt.source_tag, "testPoint_4", sizeof(pt.source_tag) - 1);
-    pt.source_tag[sizeof(pt.source_tag) - 1] = '\0';  
-    const char* server = "Agilor";
-    printf("tag:%s,Device:%s,Type:%c,sourceTag:%s\n",pt.tag,pt.point_source,pt.type,pt.source_tag);
-    c_Agpt_AddPoint(server, &pt,agitrue);
-
+    agilor_point_t  pt = ucsptToAgilorPt(p);
+//    const char* server = "Agilor";
+    c_Agpt_AddPoint(server, &pt,Isoverwrite);
 }
 
 void agilor_ucs_pt_drop(ucs_pt_t* p) {
-    char server[16]="Agilor";  
-    c_Agpt_RemovePoint(server, p->id);
-
+ //   const char* server = "Agilor";
+    agilor_point_t point;
+    char tag[64];
+    strncpy(tag,p->tag, sizeof(tag) - 1);
+    tag[sizeof(tag) - 1] = '\0'; 
+    c_Agpt_Point(server,tag,&point);
+    c_Agpt_RemovePoint(server, point.id);
 }
-void agilor_ucs_pt_insert(ucs_pt_t* p) {
-    char server[16]="Agilor";  
-    agibool manual = agifalse;
-    const char* comment =NULL;
-    agilor_value_t value = {};
-    //agilor_deviceconf_t conf = {};
-    value = ucsptToAgilorValue(p);
-    char* device_name="DV1";
-    c_Agar_Register(server,device_name,agifalse,NULL);
-    c_Agpt_SetPointValue(server,p->tag,&value,manual,comment);
-    c_Agar_Unregister(server,device_name);
 
+void agilor_ucs_pt_insert(ucs_pt_t* p) {
+//  const char* server = "Agilor";  
+    agilor_value_t value = {};
+    value = ucsptToAgilorValue(p);
+// char* device_name="DV1";
+    c_Agar_Register(server,device_name,agifalse,NULL);
+    c_Agpt_SetPointValue(server,p->tag,&value,agifalse,NULL);
+    c_Agar_Unregister(server,device_name);
 }
 
 int agilor_ucs_pt_query(char* tag, int64_t start_time, int64_t end_time, int64_t step, ucs_pt_t* pt_list) {
-
+// const char* server = "Agilor";   
+    int count = 0;
+    agirecordset result = c_Agda_TimedValue(server, tag, start_time,end_time,step);
+    if (result > 0) {
+        char tag1[64];
+        agilor_value_t value;
+        while(c_Agda_NextValue(result,tag1,&value,agitrue)){
+            pt_list[count] =agilorPtToucspt(&value);
+            strncpy(pt_list[count].tag, tag1, sizeof(pt_list[count].tag)-1);
+            pt_list[count].tag[sizeof(pt_list[count].tag) - 1] = '\0';  
+            pt_list[count].v_type = agiTypeToucsType(value.type);
+            count++;		
+        }
+     }
+    return count;
 }
+
 void agilor_ucs_pt_query_now(char* tag, ucs_pt_t* pt) {
-
+//  const char* server = "Agilor";  
+     int32_t count =1;
+     agirecordset  res = c_Agda_Snapshot(server,tag,count);
+     if(res>0){
+         char tag1[32];
+         agilor_value_t value;
+         while(c_Agda_NextValue(res,tag1,&value,agitrue)){
+                     *pt=agilorPtToucspt(&value);
+	      strncpy(pt->tag, tag1, sizeof(pt->tag)-1);
+        	      pt->tag[sizeof(pt->tag) - 1] = '\0';  	
+           }
+     } 
 }
+
 void agilor_ucs_pt_remove_before(char* tag, int64_t before_time) {
 
 } 
